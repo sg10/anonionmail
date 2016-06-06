@@ -1,14 +1,21 @@
 
 package main;
 
+
+import main.Client;
+
 public class Main {
 
+
+	
 	/**
 	 * @param args
 	 */
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		System.out.println("Hi!");
+	public static void main(String[] args) 
+	{
+		Client client = new Client();
+		System.out.println("Welcome to anONIONmail!");
+		client.startClient();
 	}
 
 }
