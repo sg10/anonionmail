@@ -7,14 +7,13 @@ import main.Client;
 public class Main {
 
 
-	
 	/**
 	 * @param args
 	 */
-	public static void main(String[] args) 
+	public static void main(String[] args)
 	{
-		Client client = new Client();
 		System.out.println("Welcome to anONIONmail!");
+		Client client = new Client();
 		client.startClient();
 	}
 
