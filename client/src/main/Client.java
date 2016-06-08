@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -24,6 +25,11 @@ import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 import javax.crypto.BadPaddingException;
@@ -37,8 +43,23 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
+
 import main.AliasKey;
 import main.Mail;
+import main.EncryptedRSAkey;
+import httpClient.Options;
 
 
 
@@ -65,6 +86,9 @@ public class Client
 			System.out.println("Using stored RSA keypair...");
 			readKeysFromFile();
 		}
+		//testJson();
+		//printServerKeyAsHexForTesting();
+		//testPubKeyEncryption();
 	}
 
 	public void startClient()
@@ -179,6 +203,7 @@ public class Client
 		byte[] pass_hash;
 		byte[] enc_hash_bytes;
 		boolean is_valid = false;
+		boolean login_correct = false;
 		byte[] enc_alias_bytes;
 		System.out.println("Logging in with alias and password:");
 		System.out.println("Please enter your alias...");
@@ -210,7 +235,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_hash = new String(enc_hash_bytes);
+		enc_hash = convertToHex(enc_hash_bytes);
 		//encrypting the alias with servers key
 		enc_alias_bytes = rsaEncryptData(alias.getBytes(), publicKey_server);
 		if(enc_alias_bytes == null)
@@ -219,20 +244,51 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_alias = new String(enc_alias_bytes);
-		//TODO: send the information to the server (encrypted with servers public key)
-		identifier = alias; //if the server says OK
-		System.out.println("Successfully logged in!");
+		enc_alias = convertToHex(enc_alias_bytes);
+		//sending the data to the server
+		try
+		{
+			login_correct = sendLoginRequest(enc_alias, enc_hash);
+		}
+		catch (IOException e)
+		{
+			System.out.println("Error while sending the login data to the server!");
+			e.printStackTrace();
+			return;
+		}
+		if(login_correct == true)
+		{
+			//if the server says OK
+			identifier = alias;
+			System.out.println("Successfully logged in!");
+		}
+		else
+		{
+			System.out.println("Alias and/or password wrong!");
+		}
 		startClient();
 	}
 
 	private void request_ServerKey()
 	{
-		System.out.print("Requesting public key from the server...");
-		//TODO: connecting to the server and requesting his public key
-		publicKey_server = generateServerPubKey(); //TODO: store the actual key...
-		System.out.print("OK\n");
-		startClient();
+		System.out.println("Requesting public key from the server...");
+		try
+		{
+			//requesting the key from the server
+			publicKey_server = sendServerKeyRequest();
+			if(publicKey_server == null)
+			{
+				System.out.println("Error while requesting public key from the server!");
+				startClient();
+				return;
+			}
+			System.out.println("Received public key!");
+			startClient();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
 	}
 	
 	private PublicKey generateServerPubKey()
@@ -265,10 +321,14 @@ public class Client
 		}
 		String alias = new String();
 		String encrypted_alias;
-		String encrypted_key;
+		String password;
+		String enc_hash;
+		EncryptedRSAkey encrypted_key;
 		byte[] enc_alias_bytes;
-		byte[] enc_key_bytes;
+		byte[] pass_hash;
+		byte[] enc_hash_bytes;
 		boolean is_valid = false;
+		boolean result = false;
 		System.out.println("Requesting Alias:");
 		System.out.println("Please enter the alias you want (between 5 and 15 characters and/or numbers)...");
 		while(is_valid == false)
@@ -281,6 +341,7 @@ public class Client
 						"character and numbers are allowed!");
 			}
 		}
+		//encrypt the alias
 		enc_alias_bytes = rsaEncryptData(alias.getBytes(), publicKey_server);
 		if(enc_alias_bytes == null)
 		{
@@ -288,30 +349,68 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_alias = new String(enc_alias_bytes);
-		//enc_key_bytes = rsaEncryptPublicKey(publicRSAkey, publicKey_server);
-		enc_key_bytes = rsaEncryptData("this is a key".getBytes(), publicKey_server); //TODO: fix the encrypt public key method ... and then delete this
-		if(enc_key_bytes == null)
+		encrypted_alias = convertToHex(enc_alias_bytes);
+		System.out.println("Please enter your desired password...");
+		password = readInput();
+		//hash the password
+		pass_hash = createHash(password.getBytes());
+		if(pass_hash == null)
 		{
-			System.out.println("An unexpected error occured while encrypting your public key!");
+			System.out.println("Error while creating the hash of your password");
 			startClient();
 			return;
 		}
-		encrypted_key = new String(enc_key_bytes);
-		//TODO: Send the alias with the public key to the server (both encrypted with servers public key)
-		//if the server responds with an ok do:
-		identifier = alias;
-		System.out.println("Alias saved!\n");
-		startClient();
+		//encrypt the hash
+		enc_hash_bytes = rsaEncryptData(pass_hash, publicKey_server);
+		if(enc_hash_bytes == null)
+		{
+			System.out.println("Error while encrypting your password hash!");
+			startClient();
+			return;
+		}
+		enc_hash = convertToHex(enc_hash_bytes);
+		//encrypt the public key with the servers public key
+		encrypted_key = rsaEncryptPublicKey(publicRSAkey, publicKey_server);
+		String enc_mod_hex = convertToHex(encrypted_key.getMod());
+		String enc_exp_hex = convertToHex(encrypted_key.getExp());
+		//send the alias, the password and the public key to the server (all encrypted with the servers public key)
+		try
+		{
+			result = sendAliasRequest(encrypted_alias, enc_hash, enc_mod_hex, enc_exp_hex);
+		}
+		catch (IOException e)
+		{
+			System.out.println("Error while sending the alias to the server!");
+			e.printStackTrace();
+			startClient();
+			return;
+		}
+		if(result == true)
+		{
+			identifier = alias;
+			System.out.println("Alias saved!\n");
+			startClient();
+			return;
+		}
+		else
+		{
+			identifier = null;
+			System.out.println("The entered alias is not free. Please enter a new one!");
+			startClient();
+		}
 	}
 
-	private void request_UserKey(String user_alias)
+	private void request_UserKey(String enc_identifier, String enc_keyowner, String keyowner)
 	{
-		System.out.print("...requesting the public key from the user...");
-		//TODO: request the key for the entered alias from the server
-		PublicKey user_key = generateServerPubKey(); //TODO: remove the generation; just for testing till the server is rdy
+		System.out.println("...requesting the public key from the user...");
+		PublicKey user_key = sendUserKeyRequest(enc_identifier, enc_keyowner);
+		if(user_key == null)
+		{
+			System.out.println("Error while requesting the users public key!");
+			return;
+		}
 		//store the new alias-key pair
-		AliasKey ak = new AliasKey(user_alias, user_key);
+		AliasKey ak = new AliasKey(keyowner, user_key);
 		user_key_list.add(ak);
 		System.out.print("OK\n");
 	}
@@ -360,12 +459,30 @@ public class Client
 				System.out.println("Please reenter the alias of the user...");
 			}
 		}
+		//Encrypt your Identifier with servers public key
+		enc_identifier_bytes = rsaEncryptData(identifier.getBytes(), publicKey_server);
+		if(enc_identifier_bytes == null)
+		{
+			System.out.println("Error in encrypting your alias!");
+			startClient();
+			return;
+		}
+		encrypted_identifier = convertToHex(enc_identifier_bytes);
+		//Encrypt Recipient with servers public key
+		encrypted_alias_bytes = rsaEncryptData(user_alias.getBytes(), publicKey_server);
+		if(encrypted_alias_bytes == null)
+		{
+			System.out.println("Error in encrypting the alias of the recipient!");
+			startClient();
+			return;
+		}
+		encrypted_recipient = convertToHex(encrypted_alias_bytes);
 		//check if the public key of this user is already stored in the list of public keys
 		key_stored = checkInKeyList(user_alias);
 		if(key_stored == false)
 		{
 			//if not then request it
-			request_UserKey(user_alias);
+			request_UserKey(encrypted_identifier, encrypted_recipient, user_alias);
 		}
 		System.out.println("Please enter the message now...(without linebreaks)");
 		message = readInput();
@@ -378,24 +495,6 @@ public class Client
 			startClient();
 			return;
 		}
-		//Encrypt your Identifier with servers public key
-		enc_identifier_bytes = rsaEncryptData(identifier.getBytes(), publicKey_server);
-		if(enc_identifier_bytes == null)
-		{
-			System.out.println("Error in encrypting your alias!");
-			startClient();
-			return;
-		}
-		encrypted_identifier = new String(enc_identifier_bytes);
-		//Encrypt Recipient with servers public key
-		encrypted_alias_bytes = rsaEncryptData(user_alias.getBytes(), publicKey_server);
-		if(encrypted_alias_bytes == null)
-		{
-			System.out.println("Error in encrypting the alias of the recipient!");
-			startClient();
-			return;
-		}
-		encrypted_recipient = new String(encrypted_alias_bytes);
 		user_key = getKeyOfUser(user_alias); //RSA public key of the user
 		if(user_key == null)
 		{
@@ -413,7 +512,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_message = new String(encrypted_message_bytes);
+		encrypted_message = convertToHex(encrypted_message_bytes);
 		//encrypt aes key with recipients public key
 		encrypted_aes_key_bytes = rsaEncryptData(aes_key, user_key);
 		if(encrypted_aes_key_bytes == null)
@@ -422,8 +521,8 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_aes_key = new String(encrypted_aes_key_bytes);
-		//TODO: send message and the key to the server
+		encrypted_aes_key = convertToHex(encrypted_aes_key_bytes);
+		//TODO: send message and the key to the server together with your id and the recipient
 		System.out.println("Message has been sent!\n");
 		startClient();
 	}
@@ -492,7 +591,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_hash = new String(enc_hash_bytes);
+		enc_hash = convertToHex(enc_hash_bytes);
 		enc_alias_bytes = rsaEncryptData(identifier.getBytes(), publicKey_server);
 		if(enc_alias_bytes == null)
 		{
@@ -500,7 +599,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_alias = new String(enc_alias_bytes);
+		enc_alias = convertToHex(enc_alias_bytes);
 		//TODO: send the fetch request to the server and store the messages in a list
 		//decrypt the aes key
 		temp_aes_key = rsaDecryptData(enc_aeskey, privateRSAkey);
@@ -704,39 +803,77 @@ public class Client
 		return null;
 	}
 
-	private byte[] rsaEncryptPublicKey(PublicKey data, PublicKey key)
+	private EncryptedRSAkey rsaEncryptPublicKey(PublicKey data, PublicKey key)
 	{
 		try
 		{
-			byte[] inputData = data.toString().getBytes();//TODO: change this, so it works...
-			Cipher rsa = Cipher.getInstance("RSA");
-			rsa.init(Cipher.ENCRYPT_MODE, key);
-			byte[] cryptData = rsa.doFinal(inputData);
-			return cryptData;
+			KeyFactory fact = KeyFactory.getInstance("RSA");
+			RSAPublicKeySpec pub = fact.getKeySpec(data, RSAPublicKeySpec.class);
+			byte[] mod = pub.getModulus().toByteArray();
+			byte[] exp = pub.getPublicExponent().toByteArray();
+			byte[] mod1 = Arrays.copyOfRange(mod, 0, 200);
+			byte[] mod2 = Arrays.copyOfRange(mod, 200, mod.length);
+			
+			byte[] enc_mod1 = rsaEncryptData(mod1, key);
+			byte[] enc_mod2 = rsaEncryptData(mod2, key);
+			byte[] enc_exp = rsaEncryptData(exp, key);
+			byte[] enc_mod = new byte[enc_mod1.length + enc_mod2.length];
+			int length = enc_mod1.length + enc_mod2.length;
+			for(int i = 0; i<length; i++)
+			{
+				if(i < enc_mod1.length)
+					enc_mod[i] = enc_mod1[i];
+				else
+					enc_mod[i] = enc_mod2[i-enc_mod1.length];
+			}
+			EncryptedRSAkey encKey = new EncryptedRSAkey(enc_mod, enc_exp);
+			return encKey;
 		}
 		catch (NoSuchAlgorithmException e)
 		{
 			System.out.println("Encryption error: Invalid Algorithm - RSA");
 			e.printStackTrace();
 		}
-		catch (NoSuchPaddingException e)
+		catch (InvalidKeySpecException e)
 		{
-			System.out.println("Encryption error: Invalid Padding - RSA");
 			e.printStackTrace();
 		}
-		catch (InvalidKeyException e)
+		return null;
+	}
+
+	private PublicKey rsaDecryptPublicKey(EncryptedRSAkey data, PrivateKey key)
+	{
+		byte[] enc_mod = data.getMod();
+		byte[] enc_mod1 = Arrays.copyOfRange(enc_mod, 0, 256);
+		byte[] enc_mod2 = Arrays.copyOfRange(enc_mod, 256, enc_mod.length);
+		byte[] mod1 = rsaDecryptData(enc_mod1, key);
+		byte[] mod2 = rsaDecryptData(enc_mod2, key);
+		int length = mod1.length + mod2.length;
+		byte[] mod = new byte[length];
+		byte[] exp = rsaDecryptData(data.getExp(), key);
+		for(int i = 0; i < length; i++)
 		{
-			System.out.println("Encryption error: Invalid key - RSA");
+			if(i < mod1.length)
+				mod[i] = mod1[i];
+			else
+				mod[i] = mod2[i-mod1.length];
+		}
+		BigInteger modulus = new BigInteger(mod);
+		BigInteger exponent = new BigInteger(exp);
+	    PublicKey pubKey;
+		try
+		{
+			RSAPublicKeySpec keySpec = new RSAPublicKeySpec(modulus, exponent);
+		    KeyFactory fact = KeyFactory.getInstance("RSA");
+			pubKey = fact.generatePublic(keySpec);
+			return pubKey;
+		}
+		catch (InvalidKeySpecException e)
+		{
 			e.printStackTrace();
 		}
-		catch (IllegalBlockSizeException e)
+		catch (NoSuchAlgorithmException e)
 		{
-			System.out.println("Encryption error: Invalid block size - RSA");
-			e.printStackTrace();
-		}
-		catch (BadPaddingException e)
-		{
-			System.out.println("Encryption error: Bad Padding - RSA");
 			e.printStackTrace();
 		}
 		return null;
@@ -865,22 +1002,327 @@ public class Client
 		return false;
 	}*/
 
+	private String convertToHex(byte[] bytes)
+	{
+		String hex = Hex.encodeHexString(bytes);
+		return hex;
+	}
+
+	private byte[] convertFromHex(String hex)
+	{
+		try
+		{
+			byte[] bytes = Hex.decodeHex(hex.toCharArray());
+			return bytes;
+		}
+		catch (DecoderException e)
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private boolean sendLoginRequest(String enc_alias, String enc_password) throws IOException
+	{
+		boolean result = false;
+		//create the json object
+		Map json=new LinkedHashMap();
+		String response_body;
+		json.put("type","login-request");
+		json.put("id",enc_alias);
+		json.put("pw",enc_password);
+		String jsonText = JSONValue.toJSONString(json);
+		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
+		//send the data to the server
+		CloseableHttpClient httpclient = HttpClients.createDefault();
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_LOGIN);
+		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+		nvps.add(new BasicNameValuePair("JSON", jsonText));
+		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+		//get the response
+		CloseableHttpResponse response = httpclient.execute(httpPost);
+		try
+		{
+		    System.out.println("Server connection: " + response.getStatusLine());
+		    HttpEntity entity = response.getEntity();
+		    // do something useful with the response body
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		    response_body = rd.readLine();
+		    if(response_body == null)
+		    {
+		    	System.out.println("Error: Got no information from the server!");
+		    	return result;
+		    }
+		    Object obj = JSONValue.parse(response_body);
+		    JSONObject response_json = (JSONObject) obj;
+		    String type;
+		    type = (String) response_json.get("type");
+		    if(!type.equals("login-response"))
+		    {
+		    	System.out.println("Error: Got the wrong response from the server!");
+		    	return result;
+		    }
+		    result = (boolean) response_json.get("result");
+		    // and ensure it is fully consumed
+		    EntityUtils.consume(entity);
+		}
+		finally
+		{
+		    response.close();
+		}
+		return result;
+	}
+
+	@SuppressWarnings("unchecked")
+	private PublicKey sendServerKeyRequest() throws IOException
+	{
+		//create the json object
+		JSONObject json= new JSONObject();
+		String response_body;
+		String modulus; //to save the modulus of the key
+		String exponent; //to save the public exponent
+		json.put("type","serverKey-request");
+		String jsonText = JSONValue.toJSONString(json);
+		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
+		//send the data to the server
+		CloseableHttpClient httpclient = HttpClients.createDefault();
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_SERVER_KEY);
+		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+		nvps.add(new BasicNameValuePair("JSON", jsonText));
+		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+		//get the response
+		CloseableHttpResponse response = httpclient.execute(httpPost);
+		try
+		{
+		    System.out.println("Server connection: " + response.getStatusLine());
+		    HttpEntity entity = response.getEntity();
+		    // do something useful with the response body
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		    response_body = rd.readLine();
+		    if(response_body == null)
+		    {
+		    	System.out.println("Error: Got no information from the server!");
+		    	return null;
+		    }
+		    Object obj = JSONValue.parse(response_body);
+		    JSONObject response_json = (JSONObject) obj;
+		    String type;
+		    type = (String) response_json.get("type");
+		    if(!type.equals("serverKey-response"))
+		    {
+		    	System.out.println("Error: Got the wrong response from the server!");
+		    	return null;
+		    }
+		    JSONObject pubKey = (JSONObject) response_json.get("pubKey");
+		    modulus = (String) pubKey.get("modulus");
+		    exponent = (String) pubKey.get("pubExp");
+			// and ensure it is fully consumed
+			EntityUtils.consume(entity);
+		}	
+		finally
+		{
+		    response.close();
+		}
+		//Recreate the PublicKey Object
+		byte[] modu = convertFromHex(modulus);
+		byte[] expo = convertFromHex(exponent);
+		BigInteger mod = new BigInteger(modu);
+		BigInteger exp = new BigInteger(expo);
+	    PublicKey serverKey;
+		try
+		{
+			RSAPublicKeySpec keySpec = new RSAPublicKeySpec(mod, exp);
+		    KeyFactory fact = KeyFactory.getInstance("RSA");
+			serverKey = fact.generatePublic(keySpec);
+			System.out.println("Modulus: " + mod.toString(16)); //TODO: delete the output, is here just for testing if all worked
+			System.out.println("PublicExponent: " + exp.toString(16));
+			return serverKey;
+		}
+		catch (InvalidKeySpecException e)
+		{
+			e.printStackTrace();
+		}
+		catch (NoSuchAlgorithmException e)
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private boolean sendAliasRequest(String enc_alias, String enc_password, String enc_modulus, String enc_exponent) throws IOException
+	{
+		boolean result = false;
+		String response_body;
+		//create the json object
+		Map json=new LinkedHashMap();
+		json.put("type","alias-request");
+		json.put("id",enc_alias);
+		Map json2 = new LinkedHashMap();
+		json2.put("modulus", enc_modulus);
+		json2.put("pubExp", enc_exponent);
+		json.put("pub", json2);
+		json.put("pw",enc_password);
+		String jsonText = JSONValue.toJSONString(json);
+		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
+		//send the data to the server
+		CloseableHttpClient httpclient = HttpClients.createDefault();
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_ALIAS);
+		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+		nvps.add(new BasicNameValuePair("JSON", jsonText));
+		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+		//get the response
+		CloseableHttpResponse response = httpclient.execute(httpPost);
+		try
+		{
+		    System.out.println("Server connection: " + response.getStatusLine());
+		    HttpEntity entity = response.getEntity();
+		    // do something useful with the response body
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		    response_body = rd.readLine();
+		    if(response_body == null)
+		    {
+		    	System.out.println("Error: Got no information from the server!");
+		    	return result;
+		    }
+		    Object obj = JSONValue.parse(response_body);
+		    JSONObject response_json = (JSONObject) obj;
+		    String type;
+		    type = (String) response_json.get("type");
+		    if(!type.equals("alias-response"))
+		    {
+		    	System.out.println("Error: Got the wrong response from the server!");
+		    	return result;
+		    }
+		    result = (boolean) response_json.get("result");
+		    // and ensure it is fully consumed
+		    EntityUtils.consume(entity);
+		}
+		finally
+		{
+		    response.close();
+		}
+		return result;
+	}
+
+	private PublicKey sendUserKeyRequest(String enc_alias, String enc_keyowner)
+	{
+		//requests the key
+		//gets the key encrypted with this users public key - so decrypt it first
+		//return the decrypted public key
+		return null;
+	}
+
+	private boolean sendSendRequest(String enc_recipient, String enc_key, String enc_sender, String enc_message)
+	{
+		//send the message
+		//return the result
+		return false;
+	}
+	
+	@SuppressWarnings("unchecked")
 	private void testJson()
 	{
 		String s;
 		Object obj;
-		System.out.println("=======decode=======");
-
-		s="[0,{\"1\":{\"2\":{\"3\":{\"4\":[5,{\"6\":7}]}}}}]";
+		JSONObject obj1;
+		JSONObject obj2;
+		/*s="[0,{\"1\":{\"2\":{\"3\":{\"4\":[5,{\"6\":7}]}}}}]";
 		obj=JSONValue.parse(s);
 		JSONArray array=(JSONArray)obj;
 		System.out.println("======the 2nd element of array======");
 		System.out.println(array.get(1));
 		System.out.println();
+		obj2=(JSONObject)array.get(1); System.out.println("======field \"1\"=========="); System.out.println(obj2.get("1")); */
+		/*s="{\"balance\":1000.21,\"num\":100,\"nickname\":null,\"is_vip\":true,\"name\":\"foo\"}";
+		obj=JSONValue.parse(s);
+		obj2 = (JSONObject)obj;
+		System.out.println(obj2.toJSONString());
+		System.out.println("Number: " + obj2.get("num"));
+		s="[{\"length\":120,\"depth\":10},{\"length\":150,\"depth\":50}]"; obj=JSONValue.parse(s); System.out.println(obj);*/
+		byte[] key1 = generateAESkey(16);
+		String key1_hex = Hex.encodeHexString(key1);
+		byte[] key2 = generateAESkey(16);
+		String key2_hex = Hex.encodeHexString(key2);
+		byte[] from1 = generateAESkey(5);
+		String from1_hex = Hex.encodeHexString(from1);
+		byte[] from2 = generateAESkey(6);
+		String from2_hex = Hex.encodeHexString(from2);
+		obj1 = new JSONObject();
+		obj1.put("key", key1_hex);
+		obj1.put("from", from1_hex);
+		obj2 = new JSONObject();
+		obj2.put("key", key2_hex);
+		obj2.put("from", from2_hex);
+		JSONArray list = new JSONArray();
+		list.add(obj1);
+		list.add(obj2);
+		//s = list.toJSONString();
+		JSONObject jobj = new JSONObject();
+		jobj.put("type", "fetch-response"); jobj.put("messages", list); System.out.println(jobj);
+		Map json=new LinkedHashMap();
+		json.put("type","login-request");
+		json.put("id",from1_hex);
+		json.put("pw",from2_hex);
+		String jsonText = JSONValue.toJSONString(json); System.out.println(jsonText);
+	}
+	
+	private void testPubKeyEncryption()
+	{
+		PublicKey tempkey = publicRSAkey;
+		printPublicKeyAsHexForTesting(tempkey);
+		EncryptedRSAkey enc_key = rsaEncryptPublicKey(tempkey, publicRSAkey);
+		PublicKey tempkey2 = rsaDecryptPublicKey(enc_key, privateRSAkey);
+		printPublicKeyAsHexForTesting(tempkey2);
+	}
 
-		JSONObject obj2=(JSONObject)array.get(1); System.out.println("======field \"1\"=========="); System.out.println(obj2.get("1")); 
-		s="{}"; obj=JSONValue.parse(s); System.out.println(obj);
-		s="[5,]"; obj=JSONValue.parse(s); System.out.println(obj);
-		s="[5,,2]"; obj=JSONValue.parse(s); System.out.println(obj);
+	private void printServerKeyAsHexForTesting() //TODO: remove (only for getting a hardcoded hex value of a pubkey for testing server communication)
+	{
+		PublicKey skey = generateServerPubKey();
+		KeyFactory fact;
+		try
+		{
+			fact = KeyFactory.getInstance("RSA");
+			RSAPublicKeySpec pub = fact.getKeySpec(skey, RSAPublicKeySpec.class);
+			byte[] mod = pub.getModulus().toByteArray();
+			byte[] exp = pub.getPublicExponent().toByteArray();
+			String mod_hex = convertToHex(mod);
+			String exp_hex = convertToHex(exp);
+			System.out.println("Modulus: " + mod_hex);
+			System.out.println("PublicExponent: " + exp_hex);
+		}
+		catch (NoSuchAlgorithmException e)
+		{
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidKeySpecException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void printPublicKeyAsHexForTesting(PublicKey key) //TODO: remove
+	{
+		KeyFactory fact;
+		try
+		{
+			fact = KeyFactory.getInstance("RSA");
+			RSAPublicKeySpec pub = fact.getKeySpec(key, RSAPublicKeySpec.class);
+			byte[] mod = pub.getModulus().toByteArray();
+			byte[] exp = pub.getPublicExponent().toByteArray();
+			String mod_hex = convertToHex(mod);
+			String exp_hex = convertToHex(exp);
+			System.out.println("Modulus: " + mod_hex);
+			System.out.println("PublicExponent: " + exp_hex);
+		}
+		catch (NoSuchAlgorithmException e)
+		{
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidKeySpecException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
