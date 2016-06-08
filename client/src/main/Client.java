@@ -33,6 +33,10 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+
 import main.AliasKey;
 import main.Mail;
 
@@ -233,7 +237,7 @@ public class Client
 	
 	private PublicKey generateServerPubKey()
 	{
-		//TODO: only for testing, delete this method if the server conenction works
+		//TODO: only for testing, delete this method if the server connection works
 		KeyPairGenerator gen;
 		PublicKey skey;
 		try
@@ -327,14 +331,14 @@ public class Client
 			startClient();
 			return;
 		}
-		System.out.println("Sending a message to another user:");
-		System.out.println("Please enter the alias of the user you want to send the message to...");
 		String user_alias = new String();
 		String message = new String();
 		String answer = new String();
 		String encrypted_recipient;
 		String encrypted_message;
 		String encrypted_aes_key;
+		String encrypted_identifier;
+		byte[] enc_identifier_bytes;
 		byte[] encrypted_alias_bytes;
 		byte[] aes_key;
 		byte[] encrypted_aes_key_bytes;
@@ -344,6 +348,8 @@ public class Client
 		boolean send_message;
 		boolean key_stored;
 		PublicKey user_key;
+		System.out.println("Sending a message to another user:");
+		System.out.println("Please enter the alias of the user you want to send the message to...");
 		while(is_valid == false)
 		{
 			user_alias = readInput();
@@ -372,6 +378,15 @@ public class Client
 			startClient();
 			return;
 		}
+		//Encrypt your Identifier with servers public key
+		enc_identifier_bytes = rsaEncryptData(identifier.getBytes(), publicKey_server);
+		if(enc_identifier_bytes == null)
+		{
+			System.out.println("Error in encrypting your alias!");
+			startClient();
+			return;
+		}
+		encrypted_identifier = new String(enc_identifier_bytes);
 		//Encrypt Recipient with servers public key
 		encrypted_alias_bytes = rsaEncryptData(user_alias.getBytes(), publicKey_server);
 		if(encrypted_alias_bytes == null)
@@ -448,6 +463,7 @@ public class Client
 		byte[] aes_key = generateAESkey(32);            //TODO: delete this
 		byte[] enc_aeskey = rsaEncryptData(aes_key, publicRSAkey); //TODO: delete the initialization and assign the value from the server
 		byte[] enc_message = aes_crypt(aes_key, "Hello World!".getBytes(), true); //TODO: same as above
+		//parse the timestamp from unixtimestamp in s  with a kalender object
 		String timestamp = "04.04.16 - 12:30"; //the time field //TODO: same as above
 		String sender = "Superpeter99"; //the from field   //TODO: same as above
 		String enc_alias;
@@ -835,7 +851,7 @@ public class Client
 		return null;
 	}
 
-	private boolean compareHashes(byte[] hash1, byte[] hash2)
+	/*private boolean compareHashes(byte[] hash1, byte[] hash2)
 	{
 		try
 		{
@@ -847,5 +863,24 @@ public class Client
 			e.printStackTrace();
 		}
 		return false;
+	}*/
+
+	private void testJson()
+	{
+		String s;
+		Object obj;
+		System.out.println("=======decode=======");
+
+		s="[0,{\"1\":{\"2\":{\"3\":{\"4\":[5,{\"6\":7}]}}}}]";
+		obj=JSONValue.parse(s);
+		JSONArray array=(JSONArray)obj;
+		System.out.println("======the 2nd element of array======");
+		System.out.println(array.get(1));
+		System.out.println();
+
+		JSONObject obj2=(JSONObject)array.get(1); System.out.println("======field \"1\"=========="); System.out.println(obj2.get("1")); 
+		s="{}"; obj=JSONValue.parse(s); System.out.println(obj);
+		s="[5,]"; obj=JSONValue.parse(s); System.out.println(obj);
+		s="[5,,2]"; obj=JSONValue.parse(s); System.out.println(obj);
 	}
 }
