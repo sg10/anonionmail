@@ -19,6 +19,7 @@ with TOR. All data is at least encrypted with the public key of the server, so e
 if we used HTTP in the final version, no one can read your data.
 
 Design Decisions:
+
 Hexadecimal:
 The alorithms to Hash, AES-encrypt/decrypt or RSA-encrypt/decrypt data are using
 byte arrays as input and output. So all encrypted and hashed data is stored as byte 
@@ -26,6 +27,7 @@ array, but sending byte arrays via JSON to the server is not practical. So all b
 are converted to hexadecimal strings (every byte between -128 and 127 of the array 
 becomes a string between 0 and f). These strings are then sent to the server via
 JSON and the server responds also with hexadecimal strings.
+
 Modulus:
 In some cases the client wants to send his RSA public key to the server or he wants 
 to receive some other users public key from the server. In this cases the RSA key needs
