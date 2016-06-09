@@ -8,4 +8,5 @@ public class Options
 	public static String REQUEST_SERVER_KEY = "request_skey.txt";
 	public static String REQUEST_USER_KEY = "request_user_key.txt";
 	public static String REQUEST_SEND = "request_send.txt";
+	public static String REQUEST_MESSAGES = "fetch_messages.txt";
 }

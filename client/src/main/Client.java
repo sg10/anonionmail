@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -27,10 +26,12 @@ import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+import java.util.Date;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -47,7 +48,6 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -90,6 +90,7 @@ public class Client
 		//printServerKeyAsHexForTesting();
 		//testPubKeyEncryption();
 		//printRequestUserKeyResponseForTesting();
+		//printMessagesForFetchRequestForTesting();
 	}
 
 	public void startClient()
@@ -261,7 +262,7 @@ public class Client
 		{
 			//if the server says OK
 			identifier = alias;
-			System.out.println("Successfully logged in!");
+			System.out.println("Successfully logged in!\n");
 		}
 		else
 		{
@@ -283,7 +284,7 @@ public class Client
 				startClient();
 				return;
 			}
-			System.out.println("Received public key!");
+			System.out.println("Received public key!\n");
 			startClient();
 		}
 		catch (IOException e)
@@ -396,7 +397,7 @@ public class Client
 		else
 		{
 			identifier = null;
-			System.out.println("The entered alias is not free. Please enter a new one!");
+			System.out.println("Error: The entered alias is not free\n");
 			startClient();
 		}
 	}
@@ -547,7 +548,6 @@ public class Client
 		}
 		catch (IOException e)
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		startClient();
@@ -584,21 +584,28 @@ public class Client
 		}
 		System.out.println("Fetching messages from the server:");
 		int message_count = 0;
-		String temp_message;
-		byte[] aes_key = generateAESkey(32);            //TODO: delete this
-		byte[] enc_aeskey = rsaEncryptData(aes_key, publicRSAkey); //TODO: delete the initialization and assign the value from the server
-		byte[] enc_message = aes_crypt(aes_key, "Hello World!".getBytes(), true); //TODO: same as above
-		//parse the timestamp from unixtimestamp in s  with a kalender object
-		String timestamp = "04.04.16 - 12:30"; //the time field //TODO: same as above
-		String sender = "Superpeter99"; //the from field   //TODO: same as above
+		String message;
+		String timestamp; //the time field
+		String sender; //the from field
 		String enc_alias;
 		String enc_hash;
+		String enc_timestamp; //timestamp from the server
+		String enc_sender; //from field from the server
+		String enc_aes_key;//aes key from the server
+		String enc_message; //message from the server
+		byte[] enc_aeskey_bytes; 
+		byte[] enc_message_bytes;
+		byte[] enc_timestamp_bytes;
+		byte[] enc_sender_bytes;
+		byte[] sender_bytes;
+		byte[] timestamp_bytes;
+		byte[] message_bytes;
+		byte[] aes_key;
 		byte[] enc_alias_bytes;
-		byte[] temp_aes_key;
-		byte[] temp_message_bytes;
 		byte[] pass_hash;
 		byte[] enc_hash_bytes;
-		Vector<Mail> mailList = new Vector<Mail>();
+		Vector<Mail> mailList = new Vector<Mail>(); //enc mails from the server
+		Vector<Mail> dec_mails = new Vector<Mail>(); //dec mails for output
 		System.out.println("Please enter your password...");
 		String password = readInput();
 		//hash the password
@@ -626,37 +633,82 @@ public class Client
 			return;
 		}
 		enc_alias = convertToHex(enc_alias_bytes);
-		//TODO: send the fetch request to the server and store the messages in a list
-		//decrypt the aes key
-		temp_aes_key = rsaDecryptData(enc_aeskey, privateRSAkey);
-		if(temp_aes_key == null)
+		//send the fetch request to the server and store the messages in a list
+		try
 		{
-			System.out.println("Error while decrypting the AES key!");
+			mailList = sendFetchRequest(enc_alias, enc_hash);
+		}
+		catch (IOException e)
+		{
+			System.out.println("Error while retrieving messages from server!");
+			e.printStackTrace();
 			startClient();
 			return;
 		}
-		//decrypt the message
-		temp_message_bytes = aes_crypt(temp_aes_key, enc_message, false);
-		if(temp_message_bytes == null)
+		message_count = mailList.size();
+		for(int i = 0; i < message_count; i++)
 		{
-			System.out.println("Error while decrypting the message!");
-			startClient();
-			return;
+			enc_sender = mailList.elementAt(i).getSender_field();
+			enc_message = mailList.elementAt(i).getMessage();
+			enc_aes_key = mailList.elementAt(i).getAes_key();
+			enc_timestamp = mailList.elementAt(i).getTimestamp();
+			enc_sender_bytes = convertFromHex(enc_sender);
+			enc_message_bytes = convertFromHex(enc_message);
+			enc_aeskey_bytes = convertFromHex(enc_aes_key);
+			enc_timestamp_bytes = convertFromHex(enc_timestamp);
+			//decrypt the sender
+			sender_bytes = rsaDecryptData(enc_sender_bytes, privateRSAkey);
+			if(sender_bytes == null)
+			{
+				System.out.println("Error while decrypting the sender of the message!("+Integer.toString(i+1)+")");
+				startClient();
+				return;
+			}
+			sender = new String(sender_bytes);
+			//decrypt the timestamp
+			timestamp_bytes = rsaDecryptData(enc_timestamp_bytes, privateRSAkey);
+			if(timestamp_bytes == null)
+			{
+				System.out.println("Error while decrypting the timestamp of the message!("+Integer.toString(i+1)+")");
+				startClient();
+				return;
+			}
+			timestamp = new String(timestamp_bytes);
+			long unixTime = Long.parseLong(timestamp);
+			Date d = new Date(unixTime * 1000L);
+			String date = d.toString();
+			//decrypt the aes key
+			aes_key = rsaDecryptData(enc_aeskey_bytes, privateRSAkey);
+			if(aes_key == null)
+			{
+				System.out.println("Error while decrypting the AES key of the message!("+Integer.toString(i+1)+")");
+				startClient();
+				return;
+			}
+			//decrypt the message
+			message_bytes = aes_crypt(aes_key, enc_message_bytes, false);
+			if(message_bytes == null)
+			{
+				System.out.println("Error while decrypting the message of the message!("+Integer.toString(i+1)+")");
+				startClient();
+				return;
+			}
+			message = new String(message_bytes);
+			//store the message and the other credentials in the list
+			Mail tempMail = new Mail(enc_aes_key, sender, date, message);
+			dec_mails.add(tempMail);
 		}
-		temp_message = new String(temp_message_bytes);
-		//store the message and the other credentials in the list
-		Mail tempMail = new Mail(new String(temp_aes_key), sender, timestamp, temp_message);
-		mailList.add(tempMail);
-		System.out.println("You have " + Integer.toString(mailList.size()) + " new messages: \n");
-		//TODO: Iterate through the list and print one message at a time, waiting for the user to press enter to show the next one
-		for(int i = 0; i < mailList.size(); i++)
+		System.out.println("You have " + Integer.toString(message_count) + " new messages: \n");
+		//Iterate through the list and print one message at a time, waiting for the user to press enter to show the next one
+		for(int i = 0; i < message_count; i++)
 		{
-			System.out.println("Message from " + mailList.elementAt(i).getSender_field() + " - " + mailList.elementAt(i).getTimestamp() + ":\n");
-			System.out.println(mailList.elementAt(i).getMessage() + "\n");
+			System.out.println(Integer.toString(i+1)+". Message from " + dec_mails.elementAt(i).getSender_field() + " - " +
+					 dec_mails.elementAt(i).getTimestamp() + ":\n");
+			System.out.println(dec_mails.elementAt(i).getMessage() + "\n");
 			System.out.println("Show next message by pressing <Enter>");
 			readInput();
 		}
-		System.out.println("You have no more messages!");
+		System.out.println("You have no more messages!\n");
 		startClient();
 	}
 	
@@ -1070,7 +1122,7 @@ public class Client
 		CloseableHttpResponse response = httpclient.execute(httpPost);
 		try
 		{
-		    System.out.println("Server connection: " + response.getStatusLine());
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
 		    HttpEntity entity = response.getEntity();
 		    // do something useful with the response body
 		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -1121,7 +1173,7 @@ public class Client
 		CloseableHttpResponse response = httpclient.execute(httpPost);
 		try
 		{
-		    System.out.println("Server connection: " + response.getStatusLine());
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
 		    HttpEntity entity = response.getEntity();
 		    // do something useful with the response body
 		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -1161,8 +1213,8 @@ public class Client
 			RSAPublicKeySpec keySpec = new RSAPublicKeySpec(mod, exp);
 		    KeyFactory fact = KeyFactory.getInstance("RSA");
 			serverKey = fact.generatePublic(keySpec);
-			System.out.println("Modulus: " + mod.toString(16)); //TODO: delete the output, is here just for testing if all worked
-			System.out.println("PublicExponent: " + exp.toString(16));
+			//System.out.println("Modulus: " + mod.toString(16)); // delete the output, is here just for testing if all worked
+			//System.out.println("PublicExponent: " + exp.toString(16));
 			return serverKey;
 		}
 		catch (InvalidKeySpecException e)
@@ -1202,7 +1254,7 @@ public class Client
 		CloseableHttpResponse response = httpclient.execute(httpPost);
 		try
 		{
-		    System.out.println("Server connection: " + response.getStatusLine());
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
 		    HttpEntity entity = response.getEntity();
 		    // do something useful with the response body
 		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -1256,7 +1308,7 @@ public class Client
 		CloseableHttpResponse response = httpclient.execute(httpPost);
 		try
 		{
-		    System.out.println("Server connection: " + response.getStatusLine());
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
 		    HttpEntity entity = response.getEntity();
 		    // do something useful with the response body
 		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -1344,7 +1396,7 @@ public class Client
 		CloseableHttpResponse response = httpclient.execute(httpPost);
 		try
 		{
-		    System.out.println("Server connection: " + response.getStatusLine());
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
 		    HttpEntity entity = response.getEntity();
 		    // do something useful with the response body
 		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -1373,6 +1425,74 @@ public class Client
 		}
 		return result;
 	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private Vector<Mail> sendFetchRequest(String enc_identifier, String enc_password) throws IOException
+	{
+		String enc_key;
+		String enc_from;
+		String enc_time;
+		String enc_message;
+		Vector<Mail> mails = new Vector<Mail>();
+		//create the json object
+		Map json=new LinkedHashMap();
+		String response_body;
+		json.put("type","fetch-request");
+		json.put("to",enc_identifier);
+		json.put("pw",enc_password);
+		String jsonText = JSONValue.toJSONString(json);
+		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
+		//send the data to the server
+		CloseableHttpClient httpclient = HttpClients.createDefault();
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_MESSAGES);
+		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
+		nvps.add(new BasicNameValuePair("JSON", jsonText));
+		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
+		//get the response
+		CloseableHttpResponse response = httpclient.execute(httpPost);
+		try
+		{
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
+		    HttpEntity entity = response.getEntity();
+		    // do something useful with the response body
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		    response_body = rd.readLine();
+		    if(response_body == null)
+		    {
+		    	System.out.println("Error: Got no information from the server!");
+		    	return null;
+		    }
+		    Object obj = JSONValue.parse(response_body);
+		    JSONObject response_json = (JSONObject) obj;
+		    String type;
+		    type = (String) response_json.get("type");
+		    if(!type.equals("fetch-response"))
+		    {
+		    	System.out.println("Error: Got the wrong response from the server!");
+		    	return null;
+		    }
+		    //get the array with the messages
+			JSONArray array = (JSONArray)response_json.get("messages");
+			for(int i = 0; i < array.size(); i++)
+			{
+				//store each encrypted mail into the vector
+				JSONObject jo = (JSONObject)array.get(i);
+				enc_key = (String)jo.get("key");
+				enc_from = (String)jo.get("from");
+				enc_time = (String)jo.get("time");
+				enc_message = (String)jo.get("msg");
+				Mail mail = new Mail(enc_key, enc_from, enc_time, enc_message);
+				mails.add(mail);
+			}
+		    // and ensure it is fully consumed
+		    EntityUtils.consume(entity);
+		}
+		finally
+		{
+		    response.close();
+		}
+		return mails;
+	}
 	
 	@SuppressWarnings("unchecked")
 	private void testJson()
@@ -1381,6 +1501,22 @@ public class Client
 		Object obj;
 		JSONObject obj1;
 		JSONObject obj2;
+		s = "{\"type\":\"blabla\",\"messages\":[{\"key\":\"hi\",\"from\":\"sepp\"},{\"key\":\"moin\",\"from\":\"klaus\"},{\"key\":\"seas\",\"from\":\"markus\"}" +
+				",{\"key\":\"dere\",\"from\":\"fabi\"}]}";
+		obj = JSONValue.parse(s);
+		obj1 = (JSONObject) obj;
+		String type = (String)obj1.get("type");
+		JSONArray array = (JSONArray)obj1.get("messages");
+		System.out.println("Type: " + type);
+		System.out.println("Array Size: " + Integer.toString(array.size()));
+		for(int i = 0; i < array.size(); i++)
+		{
+			JSONObject jo = (JSONObject)array.get(i);
+			String key = (String)jo.get("key");
+			String from = (String)jo.get("from");
+			System.out.println("Key: " + key);
+			System.out.println("From: " + from);
+		}
 		/*s="[0,{\"1\":{\"2\":{\"3\":{\"4\":[5,{\"6\":7}]}}}}]";
 		obj=JSONValue.parse(s);
 		JSONArray array=(JSONArray)obj;
@@ -1394,7 +1530,7 @@ public class Client
 		System.out.println(obj2.toJSONString());
 		System.out.println("Number: " + obj2.get("num"));
 		s="[{\"length\":120,\"depth\":10},{\"length\":150,\"depth\":50}]"; obj=JSONValue.parse(s); System.out.println(obj);*/
-		byte[] key1 = generateAESkey(16);
+		/*byte[] key1 = generateAESkey(16);
 		String key1_hex = Hex.encodeHexString(key1);
 		byte[] key2 = generateAESkey(16);
 		String key2_hex = Hex.encodeHexString(key2);
@@ -1410,15 +1546,15 @@ public class Client
 		obj2.put("from", from2_hex);
 		JSONArray list = new JSONArray();
 		list.add(obj1);
-		list.add(obj2);
+		list.add(obj2);*/
 		//s = list.toJSONString();
-		JSONObject jobj = new JSONObject();
+		/*JSONObject jobj = new JSONObject();
 		jobj.put("type", "fetch-response"); jobj.put("messages", list); System.out.println(jobj);
 		Map json=new LinkedHashMap();
 		json.put("type","login-request");
 		json.put("id",from1_hex);
 		json.put("pw",from2_hex);
-		String jsonText = JSONValue.toJSONString(json); System.out.println(jsonText);
+		String jsonText = JSONValue.toJSONString(json); System.out.println(jsonText);*/
 	}
 	
 	private void testPubKeyEncryption()
@@ -1447,10 +1583,8 @@ public class Client
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InvalidKeySpecException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -1491,11 +1625,87 @@ public class Client
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InvalidKeySpecException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+	}
+	
+	private void printMessagesForFetchRequestForTesting() //TODO: only for getting some values for the static server...
+	{
+		Vector<Mail> mails = new Vector<Mail>();
+		//1. mail
+		long unixTime = System.currentTimeMillis() / 1000L;
+		String timestamp = String.valueOf(unixTime);
+		String message = "Hi! This is a random message, just for testing the system. Cheers! danny";
+		String from = "dannytheBOY";
+		byte[] aeskey = generateAESkey(32);
+		byte[] enc_message = aes_crypt(aeskey, message.getBytes(), true);
+		byte[] enc_key = rsaEncryptData(aeskey, publicRSAkey);
+		byte[] enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
+		byte[] enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
+		String enc_msg_hex = convertToHex(enc_message);
+		String enc_key_hex = convertToHex(enc_key);
+		String enc_time_hex = convertToHex(enc_time);
+		String enc_from_hex = convertToHex(enc_from);
+		Mail m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		mails.add(m);
+		//2. mail
+		unixTime = 1465490616L;
+		timestamp = String.valueOf(unixTime);
+		message = "Hello World! How is it going today? :)";
+		from = "FunnyProgrammer";
+		aeskey = generateAESkey(32);
+		enc_message = aes_crypt(aeskey, message.getBytes(), true);
+		enc_key = rsaEncryptData(aeskey, publicRSAkey);
+		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
+		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
+		enc_msg_hex = convertToHex(enc_message);
+		enc_key_hex = convertToHex(enc_key);
+		enc_time_hex = convertToHex(enc_time);
+		enc_from_hex = convertToHex(enc_from);
+		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		mails.add(m);
+		//3. mail
+		unixTime = 1465435311L;
+		timestamp = String.valueOf(unixTime);
+		message = "What's up! I've got cards for the game next sunday, drop by if you are interested. c-dog";
+		from = "charlie";
+		aeskey = generateAESkey(32);
+		enc_message = aes_crypt(aeskey, message.getBytes(), true);
+		enc_key = rsaEncryptData(aeskey, publicRSAkey);
+		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
+		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
+		enc_msg_hex = convertToHex(enc_message);
+		enc_key_hex = convertToHex(enc_key);
+		enc_time_hex = convertToHex(enc_time);
+		enc_from_hex = convertToHex(enc_from);
+		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		mails.add(m);
+		//4. mail
+		unixTime = 1465402434L;
+		timestamp = String.valueOf(unixTime);
+		message = "Dear colleagues! I just wanted to remind you all that i'll host a grill party this friday! Hope you're all coming, that would be great fun. cheers fr4nk";
+		from = "Fman89";
+		aeskey = generateAESkey(32);
+		enc_message = aes_crypt(aeskey, message.getBytes(), true);
+		enc_key = rsaEncryptData(aeskey, publicRSAkey);
+		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
+		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
+		enc_msg_hex = convertToHex(enc_message);
+		enc_key_hex = convertToHex(enc_key);
+		enc_time_hex = convertToHex(enc_time);
+		enc_from_hex = convertToHex(enc_from);
+		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		mails.add(m);
+		//print them :)
+		for(int i = 0; i < mails.size(); i++)
+		{
+			System.out.println("-------" + Integer.toString(i+1) + "-------");
+			System.out.println("KEY: " + mails.elementAt(i).getAes_key());
+			System.out.println("FROM: " + mails.elementAt(i).getSender_field());
+			System.out.println("TIME: " + mails.elementAt(i).getTimestamp());
+			System.out.println("MESSAGE: " + mails.elementAt(i).getMessage());
 		}
 	}
 	
@@ -1515,10 +1725,8 @@ public class Client
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InvalidKeySpecException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
