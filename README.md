@@ -20,13 +20,12 @@ if we used HTTP in the final version, no one can read your data.
 
 Design Decisions:
 
-Hexadecimal:
+Base64:
 The alorithms to Hash, AES-encrypt/decrypt or RSA-encrypt/decrypt data are using
 byte arrays as input and output. So all encrypted and hashed data is stored as byte 
 array, but sending byte arrays via JSON to the server is not practical. So all byte arrays
-are converted to hexadecimal strings (every byte between -128 and 127 of the array 
-becomes a string between 0 and f). These strings are then sent to the server via
-JSON and the server responds also with hexadecimal strings.
+are converted to base64 strings. These strings are then sent to the server via
+JSON and the server responds also with base64 strings.
 
 Modulus:
 In some cases the client wants to send his RSA public key to the server or he wants 
