@@ -56,6 +56,9 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
+import sun.misc.BASE64Encoder;
+import sun.misc.BASE64Decoder;
+
 import main.AliasKey;
 import main.Mail;
 import main.EncryptedRSAkey;
@@ -87,7 +90,8 @@ public class Client
 			readKeysFromFile();
 		}
 		//testJson();
-		//printServerKeyAsHexForTesting();
+		//testBase64Converter();
+		//printServerKeyAsBase64ForTesting();
 		//testPubKeyEncryption();
 		//printRequestUserKeyResponseForTesting();
 		//printMessagesForFetchRequestForTesting();
@@ -237,7 +241,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_hash = convertToHex(enc_hash_bytes);
+		enc_hash = convertToBase64(enc_hash_bytes);
 		//encrypting the alias with servers key
 		enc_alias_bytes = rsaEncryptData(alias.getBytes(), publicKey_server);
 		if(enc_alias_bytes == null)
@@ -246,7 +250,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_alias = convertToHex(enc_alias_bytes);
+		enc_alias = convertToBase64(enc_alias_bytes);
 		//sending the data to the server
 		try
 		{
@@ -351,7 +355,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_alias = convertToHex(enc_alias_bytes);
+		encrypted_alias = convertToBase64(enc_alias_bytes);
 		System.out.println("Please enter your desired password...");
 		password = readInput();
 		//hash the password
@@ -370,11 +374,11 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_hash = convertToHex(enc_hash_bytes);
+		enc_hash = convertToBase64(enc_hash_bytes);
 		//encrypt the public key with the servers public key
 		encrypted_key = rsaEncryptPublicKey(publicRSAkey, publicKey_server);
-		String enc_mod_hex = convertToHex(encrypted_key.getMod());
-		String enc_exp_hex = convertToHex(encrypted_key.getExp());
+		String enc_mod_hex = convertToBase64(encrypted_key.getMod());
+		String enc_exp_hex = convertToBase64(encrypted_key.getExp());
 		//send the alias, the password and the public key to the server (all encrypted with the servers public key)
 		try
 		{
@@ -478,7 +482,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_identifier = convertToHex(enc_identifier_bytes);
+		encrypted_identifier = convertToBase64(enc_identifier_bytes);
 		//Encrypt Recipient with servers public key
 		encrypted_alias_bytes = rsaEncryptData(user_alias.getBytes(), publicKey_server);
 		if(encrypted_alias_bytes == null)
@@ -487,7 +491,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_recipient = convertToHex(encrypted_alias_bytes);
+		encrypted_recipient = convertToBase64(encrypted_alias_bytes);
 		//check if the public key of this user is already stored in the list of public keys
 		key_stored = checkInKeyList(user_alias);
 		if(key_stored == false)
@@ -497,7 +501,7 @@ public class Client
 		}
 		System.out.println("Please enter the message now...(without linebreaks)");
 		message = readInput();
-		System.out.println("Do you really want to send '"+ user_alias+"' this message: (yes/no)\n" + message);
+		System.out.println("Do you really want to send '"+ user_alias+"' this message: (yes/no)\n" + "\t" + message);
 		answer = readInput();
 		send_message = checkAnswer(answer);
 		if(send_message == false)
@@ -523,7 +527,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_message = convertToHex(encrypted_message_bytes);
+		encrypted_message = convertToBase64(encrypted_message_bytes);
 		//encrypt aes key with recipients public key
 		encrypted_aes_key_bytes = rsaEncryptData(aes_key, user_key);
 		if(encrypted_aes_key_bytes == null)
@@ -532,7 +536,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_aes_key = convertToHex(encrypted_aes_key_bytes);
+		encrypted_aes_key = convertToBase64(encrypted_aes_key_bytes);
 		//send message and the key (encrypted with recipient pubkey) to the server together with your id and the recipient (encrypted with servers pubkey)
 		try
 		{
@@ -624,7 +628,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_hash = convertToHex(enc_hash_bytes);
+		enc_hash = convertToBase64(enc_hash_bytes);
 		enc_alias_bytes = rsaEncryptData(identifier.getBytes(), publicKey_server);
 		if(enc_alias_bytes == null)
 		{
@@ -632,7 +636,7 @@ public class Client
 			startClient();
 			return;
 		}
-		enc_alias = convertToHex(enc_alias_bytes);
+		enc_alias = convertToBase64(enc_alias_bytes);
 		//send the fetch request to the server and store the messages in a list
 		try
 		{
@@ -652,10 +656,10 @@ public class Client
 			enc_message = mailList.elementAt(i).getMessage();
 			enc_aes_key = mailList.elementAt(i).getAes_key();
 			enc_timestamp = mailList.elementAt(i).getTimestamp();
-			enc_sender_bytes = convertFromHex(enc_sender);
-			enc_message_bytes = convertFromHex(enc_message);
-			enc_aeskey_bytes = convertFromHex(enc_aes_key);
-			enc_timestamp_bytes = convertFromHex(enc_timestamp);
+			enc_sender_bytes = convertFromBase64(enc_sender);
+			enc_message_bytes = convertFromBase64(enc_message);
+			enc_aeskey_bytes = convertFromBase64(enc_aes_key);
+			enc_timestamp_bytes = convertFromBase64(enc_timestamp);
 			//decrypt the sender
 			sender_bytes = rsaDecryptData(enc_sender_bytes, privateRSAkey);
 			if(sender_bytes == null)
@@ -702,9 +706,9 @@ public class Client
 		//Iterate through the list and print one message at a time, waiting for the user to press enter to show the next one
 		for(int i = 0; i < message_count; i++)
 		{
-			System.out.println(Integer.toString(i+1)+". Message from " + dec_mails.elementAt(i).getSender_field() + " - " +
+			System.out.println(Integer.toString(i+1)+". Message from '" + dec_mails.elementAt(i).getSender_field() + "' - " +
 					 dec_mails.elementAt(i).getTimestamp() + ":\n");
-			System.out.println(dec_mails.elementAt(i).getMessage() + "\n");
+			System.out.println("\t" + dec_mails.elementAt(i).getMessage() + "\n");
 			System.out.println("Show next message by pressing <Enter>");
 			readInput();
 		}
@@ -1066,7 +1070,7 @@ public class Client
 		return null;
 	}
 
-	/*private boolean compareHashes(byte[] hash1, byte[] hash2)
+	private boolean compareHashes(byte[] hash1, byte[] hash2)
 	{
 		try
 		{
@@ -1078,7 +1082,7 @@ public class Client
 			e.printStackTrace();
 		}
 		return false;
-	}*/
+	}
 
 	private String convertToHex(byte[] bytes)
 	{
@@ -1098,6 +1102,39 @@ public class Client
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	private String convertToBase64(byte[] bytes)
+	{
+		String b64 = new BASE64Encoder().encode(bytes);
+		return b64;
+	}
+
+	private byte[] convertFromBase64(String b64)
+	{
+		byte[] bytes;
+		try
+		{
+			bytes = new BASE64Decoder().decodeBuffer(b64);
+			return bytes;
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private void testBase64Converter()
+	{
+		String s = "Frederik war hier";
+		byte[] array = s.getBytes();
+		System.out.println("Starting string: " + s);
+		String b64 = convertToBase64(array);
+		System.out.println("Base 64 string: "+b64);
+		byte[] new_array = convertFromBase64(b64);
+		String newstring = new String(new_array);
+		System.out.println("Converted string: " + newstring);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -1203,8 +1240,8 @@ public class Client
 		    response.close();
 		}
 		//Recreate the PublicKey Object
-		byte[] modu = convertFromHex(modulus);
-		byte[] expo = convertFromHex(exponent);
+		byte[] modu = convertFromBase64(modulus);
+		byte[] expo = convertFromBase64(exponent);
 		BigInteger mod = new BigInteger(modu);
 		BigInteger exp = new BigInteger(expo);
 	    PublicKey serverKey;
@@ -1327,10 +1364,10 @@ public class Client
 		    	System.out.println("Error: Got the wrong response from the server!");
 		    	return null;
 		    }
-		    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in hex
+		    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
 		    JSONObject pubKey = (JSONObject) response_json.get("pub");  //the encrypted public key
-		    enc_modulus = (String) pubKey.get("modulus"); //the encrypted modulus in hex
-		    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in hex
+		    enc_modulus = (String) pubKey.get("modulus"); //the encrypted modulus in Base64
+		    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in Base64
 			// and ensure it is fully consumed
 			EntityUtils.consume(entity);
 		}	
@@ -1338,13 +1375,13 @@ public class Client
 		{
 		    response.close();
 		}
-		byte[] enc_key_owner_bytes = convertFromHex(enc_key_owner);
+		byte[] enc_key_owner_bytes = convertFromBase64(enc_key_owner);
 		byte[] key_owner_bytes = rsaDecryptData(enc_key_owner_bytes, privateRSAkey);
 		System.out.println("Key Owner: " + new String(key_owner_bytes));
 		//got the key encrypted with this users public key - so decrypt it first
 		//Recreate the Encrypted Key Object
-		byte[] enc_mod = convertFromHex(enc_modulus);
-		byte[] enc_exp = convertFromHex(enc_exponent);
+		byte[] enc_mod = convertFromBase64(enc_modulus);
+		byte[] enc_exp = convertFromBase64(enc_exponent);
 		EncryptedRSAkey enc_key = new EncryptedRSAkey(enc_mod, enc_exp);
 		PublicKey userKey = rsaDecryptPublicKey(enc_key, privateRSAkey);
 		//return the decrypted public key
@@ -1355,10 +1392,10 @@ public class Client
 			RSAPublicKeySpec pub = fact.getKeySpec(userKey, RSAPublicKeySpec.class);
 			byte[] modu = pub.getModulus().toByteArray();
 			byte[] expo = pub.getPublicExponent().toByteArray();
-			String modu_hex = convertToHex(modu);
-			String expo_hex = convertToHex(expo);
-			System.out.println("Modulus: " + modu_hex);
-			System.out.println("PublicExponent: " + expo_hex);
+			String modu_b64 = convertToBase64(modu);
+			String expo_b64 = convertToBase64(expo);
+			System.out.println("Modulus: " + modu_b64);
+			System.out.println("PublicExponent: " + expo_b64);
 		}
 		catch (InvalidKeySpecException e)
 		{
@@ -1560,13 +1597,13 @@ public class Client
 	private void testPubKeyEncryption()
 	{
 		PublicKey tempkey = publicRSAkey;
-		printPublicKeyAsHexForTesting(tempkey);
+		printPublicKeyAsBase64ForTesting(tempkey);
 		EncryptedRSAkey enc_key = rsaEncryptPublicKey(tempkey, publicRSAkey);
 		PublicKey tempkey2 = rsaDecryptPublicKey(enc_key, privateRSAkey);
-		printPublicKeyAsHexForTesting(tempkey2);
+		printPublicKeyAsBase64ForTesting(tempkey2);
 	}
 
-	private void printServerKeyAsHexForTesting() //TODO: remove (only for getting a hardcoded hex value of a pubkey for testing server communication)
+	private void printServerKeyAsBase64ForTesting() //TODO: remove (only for getting a hardcoded hex value of a pubkey for testing server communication)
 	{
 		PublicKey skey = generateServerPubKey();
 		KeyFactory fact;
@@ -1576,8 +1613,8 @@ public class Client
 			RSAPublicKeySpec pub = fact.getKeySpec(skey, RSAPublicKeySpec.class);
 			byte[] mod = pub.getModulus().toByteArray();
 			byte[] exp = pub.getPublicExponent().toByteArray();
-			String mod_hex = convertToHex(mod);
-			String exp_hex = convertToHex(exp);
+			String mod_hex = convertToBase64(mod);
+			String exp_hex = convertToBase64(exp);
 			System.out.println("Modulus: " + mod_hex);
 			System.out.println("PublicExponent: " + exp_hex);
 		}
@@ -1594,34 +1631,34 @@ public class Client
 		PublicKey key = generateServerPubKey();
 		byte[] alias = "Legolas98".getBytes();
 		KeyFactory fact;
-		System.out.println("Starting alias: " + convertToHex(alias));
+		System.out.println("Starting alias: " + convertToBase64(alias));
 		EncryptedRSAkey enc_key = rsaEncryptPublicKey(key, publicRSAkey);
-		String hex_mod = convertToHex(enc_key.getMod());
-		String hex_exp = convertToHex(enc_key.getExp());
-		System.out.println("Modulus: " + hex_mod);
-		System.out.println("PublicExponent: " + hex_exp);
+		String b64_mod = convertToBase64(enc_key.getMod());
+		String b64_exp = convertToBase64(enc_key.getExp());
+		System.out.println("Modulus: " + b64_mod);
+		System.out.println("PublicExponent: " + b64_exp);
 		byte[] enc_alias_bytes = rsaEncryptData(alias, publicRSAkey);
-		String hex_alias = convertToHex(enc_alias_bytes);
-		System.out.println("Alias: " + hex_alias);
+		String b64_alias = convertToBase64(enc_alias_bytes);
+		System.out.println("Alias: " + b64_alias);
 		System.out.println("---Test---");
-		byte[] dehex_alias = convertFromHex(hex_alias);
-		byte[] dehex_mod = convertFromHex(hex_mod);
-		byte[] dehex_exp = convertFromHex(hex_exp);
-		byte[] dec_alias = rsaDecryptData(dehex_alias, privateRSAkey);
-		EncryptedRSAkey dehex_key = new EncryptedRSAkey(dehex_mod, dehex_exp);
-		PublicKey pubb = rsaDecryptPublicKey(dehex_key, privateRSAkey);
+		byte[] deb_alias = convertFromBase64(b64_alias);
+		byte[] deb_mod = convertFromBase64(b64_mod);
+		byte[] deb_exp = convertFromBase64(b64_exp);
+		byte[] dec_alias = rsaDecryptData(deb_alias, privateRSAkey);
+		EncryptedRSAkey deb_key = new EncryptedRSAkey(deb_mod, deb_exp);
+		PublicKey pubb = rsaDecryptPublicKey(deb_key, privateRSAkey);
 		try
 		{
 			fact = KeyFactory.getInstance("RSA");
 			RSAPublicKeySpec pub = fact.getKeySpec(pubb, RSAPublicKeySpec.class);
 			byte[] mod = pub.getModulus().toByteArray();
 			byte[] exp = pub.getPublicExponent().toByteArray();
-			String mod_hex = convertToHex(mod);
-			String exp_hex = convertToHex(exp);
-			String alias_hex = convertToHex(dec_alias);
-			System.out.println("Modulus: " + mod_hex);
-			System.out.println("PublicExponent: " + exp_hex);
-			System.out.println("Alias: " + alias_hex);
+			String mod_b64 = convertToBase64(mod);
+			String exp_b64 = convertToBase64(exp);
+			String alias_b64 = convertToBase64(dec_alias);
+			System.out.println("Modulus: " + mod_b64);
+			System.out.println("PublicExponent: " + exp_b64);
+			System.out.println("Alias: " + alias_b64);
 		}
 		catch (NoSuchAlgorithmException e)
 		{
@@ -1644,11 +1681,11 @@ public class Client
 		byte[] enc_key = rsaEncryptData(aeskey, publicRSAkey);
 		byte[] enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
 		byte[] enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
-		String enc_msg_hex = convertToHex(enc_message);
-		String enc_key_hex = convertToHex(enc_key);
-		String enc_time_hex = convertToHex(enc_time);
-		String enc_from_hex = convertToHex(enc_from);
-		Mail m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		String enc_msg_b64 = convertToBase64(enc_message);
+		String enc_key_b64 = convertToBase64(enc_key);
+		String enc_time_b64 = convertToBase64(enc_time);
+		String enc_from_b64 = convertToBase64(enc_from);
+		Mail m = new Mail(enc_key_b64,enc_from_b64,enc_time_b64,enc_msg_b64);
 		mails.add(m);
 		//2. mail
 		unixTime = 1465490616L;
@@ -1660,11 +1697,11 @@ public class Client
 		enc_key = rsaEncryptData(aeskey, publicRSAkey);
 		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
 		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
-		enc_msg_hex = convertToHex(enc_message);
-		enc_key_hex = convertToHex(enc_key);
-		enc_time_hex = convertToHex(enc_time);
-		enc_from_hex = convertToHex(enc_from);
-		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		enc_msg_b64 = convertToBase64(enc_message);
+		enc_key_b64 = convertToBase64(enc_key);
+		enc_time_b64 = convertToBase64(enc_time);
+		enc_from_b64 = convertToBase64(enc_from);
+		m = new Mail(enc_key_b64,enc_from_b64,enc_time_b64,enc_msg_b64);
 		mails.add(m);
 		//3. mail
 		unixTime = 1465435311L;
@@ -1676,11 +1713,11 @@ public class Client
 		enc_key = rsaEncryptData(aeskey, publicRSAkey);
 		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
 		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
-		enc_msg_hex = convertToHex(enc_message);
-		enc_key_hex = convertToHex(enc_key);
-		enc_time_hex = convertToHex(enc_time);
-		enc_from_hex = convertToHex(enc_from);
-		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		enc_msg_b64 = convertToBase64(enc_message);
+		enc_key_b64 = convertToBase64(enc_key);
+		enc_time_b64 = convertToBase64(enc_time);
+		enc_from_b64 = convertToBase64(enc_from);
+		m = new Mail(enc_key_b64,enc_from_b64,enc_time_b64,enc_msg_b64);
 		mails.add(m);
 		//4. mail
 		unixTime = 1465402434L;
@@ -1692,11 +1729,11 @@ public class Client
 		enc_key = rsaEncryptData(aeskey, publicRSAkey);
 		enc_time = rsaEncryptData(timestamp.getBytes(), publicRSAkey);
 		enc_from = rsaEncryptData(from.getBytes(), publicRSAkey);
-		enc_msg_hex = convertToHex(enc_message);
-		enc_key_hex = convertToHex(enc_key);
-		enc_time_hex = convertToHex(enc_time);
-		enc_from_hex = convertToHex(enc_from);
-		m = new Mail(enc_key_hex,enc_from_hex,enc_time_hex,enc_msg_hex);
+		enc_msg_b64 = convertToBase64(enc_message);
+		enc_key_b64 = convertToBase64(enc_key);
+		enc_time_b64 = convertToBase64(enc_time);
+		enc_from_b64 = convertToBase64(enc_from);
+		m = new Mail(enc_key_b64,enc_from_b64,enc_time_b64,enc_msg_b64);
 		mails.add(m);
 		//print them :)
 		for(int i = 0; i < mails.size(); i++)
@@ -1709,7 +1746,7 @@ public class Client
 		}
 	}
 	
-	private void printPublicKeyAsHexForTesting(PublicKey key) //TODO: remove
+	private void printPublicKeyAsBase64ForTesting(PublicKey key) //TODO: remove
 	{
 		KeyFactory fact;
 		try
@@ -1718,8 +1755,8 @@ public class Client
 			RSAPublicKeySpec pub = fact.getKeySpec(key, RSAPublicKeySpec.class);
 			byte[] mod = pub.getModulus().toByteArray();
 			byte[] exp = pub.getPublicExponent().toByteArray();
-			String mod_hex = convertToHex(mod);
-			String exp_hex = convertToHex(exp);
+			String mod_hex = convertToBase64(mod);
+			String exp_hex = convertToBase64(exp);
 			System.out.println("Modulus: " + mod_hex);
 			System.out.println("PublicExponent: " + exp_hex);
 		}
