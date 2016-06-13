@@ -33,7 +33,7 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     autoescape=True)
     
 from Crypto.PublicKey import RSA
-from base64 import b64decode
+import base64
 # [END imports]
 
 DEFAULT_GUESTBOOK_NAME = 'default_guestbook'
@@ -126,10 +126,19 @@ class MainPage(webapp2.RequestHandler):
         def decrypt(base64cypher):
             key = open("key/anonionmail", "r").read()
             rsakey = RSA.importKey(key)
-            raw_cipher_data = b64decode(base64cypher)
-            ecrypted = rsakey.decrypt(raw_cipher_data)
-            print rsakey
-            return ecrypted
+            raw_cipher_data = base64.b64decode(base64cypher)
+            print raw_cipher_data
+            print len(raw_cipher_data)
+            print " now decrypt" 
+            decrypted = rsakey.decrypt(raw_cipher_data)
+            #remove padding
+            pos = decrypted.rfind('\x00')
+            if pos > 0:
+                decrypted = decrypted[pos+1:]
+                print "cut at "
+                print pos
+            print decrypted
+            return decrypted
         
         def error(msg):
             obj = {
@@ -139,7 +148,7 @@ class MainPage(webapp2.RequestHandler):
             return json.dumps(obj)
             
         def alias(jdata):
-            pname = jdata['id']
+            pname = decrypt(jdata['id'])
             query = Pseudonym.query(Pseudonym.alias==pname)
             exists = query.get() is not None
             if not exists:
@@ -175,10 +184,20 @@ class MainPage(webapp2.RequestHandler):
         def serverkey(jdata):
             key = open("key/anonionmail.pub", "r").read()
             rsakey = RSA.importKey(key)
-            print rsakey
+            import struct
             print rsakey.n
             print rsakey.e
-            self.response.out.write(error("fuckoff"))
+            print struct.pack("I", rsakey.e)
+            obj = {
+                'type': 'serverKey-response', 
+                'pubKey': 
+                {
+                    "modulus":base64.b64encode(str(rsakey.n)),
+                    "pubExp":base64.b64encode(str(rsakey.e))
+                }
+            } 
+            
+            self.response.out.write(json.dumps(obj))
             return
             
         types = {

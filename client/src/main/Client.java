@@ -39,6 +39,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -97,6 +98,7 @@ public class Client
 		//testPubKeyEncryption();
 		//printRequestUserKeyResponseForTesting();
 		//printMessagesForFetchRequestForTesting();
+		request_ServerKey();
 	}
 
 	public void startClient()
@@ -357,7 +359,7 @@ public class Client
 			startClient();
 			return;
 		}
-		encrypted_alias = convertToBase64(enc_alias_bytes);
+		encrypted_alias = DatatypeConverter.printBase64Binary(enc_alias_bytes);
 		System.out.println("Please enter your desired password...");
 		password = readInput();
 		//hash the password
@@ -870,6 +872,8 @@ public class Client
 			Cipher rsa = Cipher.getInstance("RSA");
 			rsa.init(Cipher.ENCRYPT_MODE, key);
 			byte[] cryptData = rsa.doFinal(data);
+			System.out.println(cryptData.length);
+			System.out.println(new String(cryptData));
 			return cryptData;
 		}
 		catch (NoSuchAlgorithmException e)
@@ -1251,8 +1255,8 @@ public class Client
 			
 			
 		//Recreate the PublicKey Object
-		byte[] modu = convertFromBase64(modulus);
-		byte[] expo = convertFromBase64(exponent);
+		String modu = new String(DatatypeConverter.parseBase64Binary(modulus));//convertFromBase64(modulus);
+		String expo = new String(DatatypeConverter.parseBase64Binary(exponent));//convertFromBase64(exponent);
 		BigInteger mod = new BigInteger(modu);
 		BigInteger exp = new BigInteger(expo);
 	    PublicKey serverKey;
@@ -1375,7 +1379,6 @@ public class Client
 	{
 		//send the message
 		boolean result = false;
-		String response_body;
 		//create the json object
 		Map json=new LinkedHashMap();
 		json.put("type","send-request");
@@ -1417,7 +1420,6 @@ public class Client
 		Vector<Mail> mails = new Vector<Mail>();
 		//create the json object
 		Map json=new LinkedHashMap();
-		String response_body;
 		json.put("type","fetch-request");
 		json.put("to",enc_identifier);
 		json.put("pw",enc_password);
