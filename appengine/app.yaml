@@ -13,6 +13,7 @@ handlers:
 
 - url: /.*
   script: guestbook.app
+  secure: never # just for testing 
 # [END handlers]
 
 # [START libraries]

@@ -64,6 +64,12 @@ class Greeting(ndb.Model):
 # [END greeting]
 
 
+# [START constants]
+PSEUDONYM_STORE_KEY = 'anonionmail_users'
+MAIL_STORE_KEY = 'anonionmail_mails'
+# [END constants]
+
+
 # [START models]
 class Anonionmail(ndb.Model):
     """Model for representing an email."""
@@ -71,7 +77,7 @@ class Anonionmail(ndb.Model):
     author = ndb.StringProperty(indexed=False)
     date = ndb.DateTimeProperty(auto_now_add=True)
     key = ndb.StringProperty(indexed=False)
-    message = ndb.StringProperty(indexed=False)
+    message = ndb.TextProperty(indexed=False)
     
     
 class Pseudonym(ndb.Model):
@@ -106,10 +112,10 @@ class MainPage(webapp2.RequestHandler):
             'url': url,
             'url_linktext': url_linktext,
         }
+        template = JINJA_ENVIRONMENT.get_template('index.html')
+        self.response.write(template.render(template_values))
 
     def post(self):
-        #template = JINJA_ENVIRONMENT.get_template('index.html')
-        #self.response.write(template.render(template_values))
         
 
         self.response.headers['Content-Type'] = 'application/json'  
@@ -122,7 +128,16 @@ class MainPage(webapp2.RequestHandler):
             return json.dumps(obj)
             
         def alias(jdata):
-            self.response.out.write(error("alias not implemented yet"))
+            pname = 'andy'
+            query = Pseudonym.query(Pseudonym.alias==pname)
+            if query.get() is not None:  
+                self.response.out.write(error("person already exists"))
+                return
+            # todo: check existing alias
+            p = Pseudonym(alias=pname, pubkey='DEADBEEF', password='12345')
+            p.put()
+
+            self.response.out.write(error("person was put in datastore"))
             return
             
         def keyreq(jdata):
@@ -138,6 +153,8 @@ class MainPage(webapp2.RequestHandler):
             return
             
         def login(jdata):
+            query = Pseudonym.query(ancestor=PSEUDONYM_STORE_KEY).order(-Greeting.date)
+            greetings = greetings_query.fetch(10)
             self.response.out.write(error("longin not implemented yet"))
             return
             
@@ -159,7 +176,8 @@ class MainPage(webapp2.RequestHandler):
             reqtype = jdata['type']
             types[reqtype](jdata)
             print reqtype
-        except:
+        except Exception as err:
+            print("error occured: {0}".format(err))
             self.response.out.write(error("due to security reasons no specific error message is provided"))
             return
             
