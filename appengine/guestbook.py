@@ -31,6 +31,9 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
     extensions=['jinja2.ext.autoescape'],
     autoescape=True)
+    
+from Crypto.PublicKey import RSA
+from base64 import b64decode
 # [END imports]
 
 DEFAULT_GUESTBOOK_NAME = 'default_guestbook'
@@ -120,6 +123,14 @@ class MainPage(webapp2.RequestHandler):
 
         self.response.headers['Content-Type'] = 'application/json'  
         
+        def decrypt(base64cypher):
+            key = open("key/anonionmail", "r").read()
+            rsakey = RSA.importKey(key)
+            raw_cipher_data = b64decode(base64cypher)
+            ecrypted = rsakey.decrypt(raw_cipher_data)
+            print rsakey
+            return ecrypted
+        
         def error(msg):
             obj = {
                 'type': 'error', 
@@ -128,16 +139,19 @@ class MainPage(webapp2.RequestHandler):
             return json.dumps(obj)
             
         def alias(jdata):
-            pname = 'andy'
+            pname = jdata['id']
             query = Pseudonym.query(Pseudonym.alias==pname)
-            if query.get() is not None:  
-                self.response.out.write(error("person already exists"))
-                return
-            # todo: check existing alias
-            p = Pseudonym(alias=pname, pubkey='DEADBEEF', password='12345')
-            p.put()
-
-            self.response.out.write(error("person was put in datastore"))
+            exists = query.get() is not None
+            if not exists:
+                p = Pseudonym(alias=pname, pubkey='DEADBEEF', password='12345') #TODO
+                p.put()
+            
+            obj = {
+                'type': 'alias-response', 
+                'result': not exists,
+            } 
+            self.response.out.write(json.dumps(obj))
+            decrypt("DEADBEEF")
             return
             
         def keyreq(jdata):
@@ -159,7 +173,11 @@ class MainPage(webapp2.RequestHandler):
             return
             
         def serverkey(jdata):
-            self.response.out.write(error("sk not implemented yet"))
+            key = open("key/anonionmail.pub", "r").read()
+            rsakey = RSA.importKey(key)
+            print rsakey
+            print rsakey.n
+            print rsakey.e
             return
             
         types = {
@@ -172,7 +190,9 @@ class MainPage(webapp2.RequestHandler):
         }
             
         try:
-            jdata = json.loads(cgi.escape(self.request.body))
+            incomming = cgi.escape(self.request.body)
+            print incomming
+            jdata = json.loads(incomming)
             reqtype = jdata['type']
             types[reqtype](jdata)
             print reqtype

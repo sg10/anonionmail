@@ -1,6 +1,6 @@
 runtime: python27
 api_version: 1
-threadsafe: true
+threadsafe: false
 
 # [START handlers]
 handlers:
@@ -13,7 +13,7 @@ handlers:
 
 - url: /.*
   script: guestbook.app
-  secure: never # just for testing 
+  secure: always # yay security 
 # [END handlers]
 
 # [START libraries]
@@ -22,4 +22,8 @@ libraries:
   version: latest
 - name: jinja2
   version: latest
+- name: pycrypto
+  version: "2.6"
+- name: lxml
+  version: "2.3"
 # [END libraries]
