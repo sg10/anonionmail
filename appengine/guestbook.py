@@ -178,6 +178,7 @@ class MainPage(webapp2.RequestHandler):
             print rsakey
             print rsakey.n
             print rsakey.e
+            self.response.out.write(error("fuckoff"))
             return
             
         types = {

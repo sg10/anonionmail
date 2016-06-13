@@ -51,8 +51,10 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
@@ -1150,6 +1152,52 @@ public class Client
 		System.out.println("Converted string: " + newstring);
 	}
 
+	
+	private JSONObject sendToServer(String json){
+
+		System.out.println("Sending request: "+ json); //TODO: remove if all is working
+		//send the data to the server
+		CloseableHttpResponse response = null;
+		JSONObject response_json = null;
+		try
+		{
+			CloseableHttpClient httpclient = HttpClients.createDefault();
+			HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
+			StringEntity sentity = new StringEntity(json);
+			sentity.setContentType(new BasicHeader("Content-Type",
+	        "application/json"));
+			httpPost.setEntity(sentity);
+			//get the response
+			response = httpclient.execute(httpPost);
+			String response_body;
+		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
+		    HttpEntity entity = response.getEntity();
+		    // do something useful with the response body
+		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+		    response_body = rd.readLine();
+		    if(response_body == null)
+		    {
+		    	System.out.println("Error: Got no information from the server!");
+		    	return null;
+		    }
+		    Object obj = JSONValue.parse(response_body);
+		    response_json = (JSONObject) obj;
+			// and ensure it is fully consumed
+			EntityUtils.consume(entity);
+		}
+		catch (Exception e){
+			e.printStackTrace();
+		}
+		finally
+		{
+		    try {
+				if(response!=null) response.close();
+			} catch (IOException e) {
+			}
+		}
+		return response_json;
+	}
+
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private boolean sendLoginRequest(String enc_alias, String enc_password) throws IOException
 	{
@@ -1161,44 +1209,16 @@ public class Client
 		json.put("id",enc_alias);
 		json.put("pw",enc_password);
 		String jsonText = JSONValue.toJSONString(json);
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return result;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("login-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return result;
-		    }
-		    result = (boolean) response_json.get("result");
-		    // and ensure it is fully consumed
-		    EntityUtils.consume(entity);
-		}
-		finally
-		{
-		    response.close();
-		}
+
+	    JSONObject response_json = sendToServer(jsonText);
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("login-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return result;
+	    }
+	    result = (boolean) response_json.get("result");
 		return result;
 	}
 
@@ -1207,51 +1227,29 @@ public class Client
 	{
 		//create the json object
 		JSONObject json= new JSONObject();
-		String response_body;
 		String modulus; //to save the modulus of the key
 		String exponent; //to save the public exponent
 		json.put("type","serverKey-request");
+		
 		String jsonText = JSONValue.toJSONString(json);
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return null;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("serverKey-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return null;
-		    }
-		    JSONObject pubKey = (JSONObject) response_json.get("pubKey");
-		    modulus = (String) pubKey.get("modulus");
-		    exponent = (String) pubKey.get("pubExp");
-			// and ensure it is fully consumed
-			EntityUtils.consume(entity);
-		}	
-		finally
-		{
-		    response.close();
+		
+		JSONObject response_json = sendToServer(jsonText);
+		if(response_json==null){
+			System.out.println("Error: Could not parse JSON from server!");
+			return null;
 		}
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("serverKey-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return null;
+	    }
+	    JSONObject pubKey = (JSONObject) response_json.get("pubKey");
+	    modulus = (String) pubKey.get("modulus");
+	    exponent = (String) pubKey.get("pubExp");
+			
+			
 		//Recreate the PublicKey Object
 		byte[] modu = convertFromBase64(modulus);
 		byte[] expo = convertFromBase64(exponent);
@@ -1282,7 +1280,6 @@ public class Client
 	private boolean sendAliasRequest(String enc_alias, String enc_password, String enc_modulus, String enc_exponent) throws IOException
 	{
 		boolean result = false;
-		String response_body;
 		//create the json object
 		Map json=new LinkedHashMap();
 		json.put("type","alias-request");
@@ -1293,44 +1290,20 @@ public class Client
 		json.put("pub", json2);
 		json.put("pw",enc_password);
 		String jsonText = JSONValue.toJSONString(json);
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return result;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("alias-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return result;
-		    }
-		    result = (boolean) response_json.get("result");
-		    // and ensure it is fully consumed
-		    EntityUtils.consume(entity);
+		
+	    JSONObject response_json = sendToServer(jsonText);
+		if(response_json==null){
+			System.out.println("Error: Could not parse JSON from server!");
+			return result;
 		}
-		finally
-		{
-		    response.close();
-		}
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("alias-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return result;
+	    }
+	    result = (boolean) response_json.get("result");
 		return result;
 	}
 
@@ -1346,48 +1319,24 @@ public class Client
 		json.put("id", enc_alias);
 		json.put("from", enc_keyowner);
 		String jsonText = JSONValue.toJSONString(json);
-		String response_body;
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return null;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("public-key-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return null;
-		    }
-		    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
-		    JSONObject pubKey = (JSONObject) response_json.get("pub");  //the encrypted public key
-		    enc_modulus = (String) pubKey.get("modulus"); //the encrypted modulus in Base64
-		    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in Base64
-			// and ensure it is fully consumed
-			EntityUtils.consume(entity);
-		}	
-		finally
-		{
-		    response.close();
+
+	    JSONObject response_json = sendToServer(jsonText);
+		if(response_json==null){
+			System.out.println("Error: Could not parse JSON from server!");
+			return null;
 		}
+	    
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("public-key-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return null;
+	    }
+	    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
+	    JSONObject pubKey = (JSONObject) response_json.get("pub");  //the encrypted public key
+	    enc_modulus = (String) pubKey.get("modulus"); //the encrypted modulus in Base64
+	    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in Base64
 		byte[] enc_key_owner_bytes = convertFromBase64(enc_key_owner);
 		byte[] key_owner_bytes = rsaDecryptData(enc_key_owner_bytes, privateRSAkey);
 		System.out.println("Key Owner: " + new String(key_owner_bytes));
@@ -1435,50 +1384,26 @@ public class Client
 		json.put("from",enc_sender);
 		json.put("msg", enc_message);
 		String jsonText = JSONValue.toJSONString(json);
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return result;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("send-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return result;
-		    }
-		    result = (boolean) response_json.get("result");
-		    if(result == false)
-		    {
-		    	String fail_reason = (String) response_json.get("message");
-		    	System.out.println("Error while sending the message!");
-		    	System.out.println("Errorreason: " + fail_reason);
-		    }
-		    // and ensure it is fully consumed
-		    EntityUtils.consume(entity);
+
+	    JSONObject response_json = sendToServer(jsonText);
+		if(response_json==null){
+			System.out.println("Error: Could not parse JSON from server!");
+			return result;
 		}
-		finally
-		{
-		    response.close();
-		}
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("send-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return result;
+	    }
+	    result = (boolean) response_json.get("result");
+	    if(result == false)
+	    {
+	    	String fail_reason = (String) response_json.get("message");
+	    	System.out.println("Error while sending the message!");
+	    	System.out.println("Errorreason: " + fail_reason);
+	    }
 		return result;
 	}
 
@@ -1497,55 +1422,31 @@ public class Client
 		json.put("to",enc_identifier);
 		json.put("pw",enc_password);
 		String jsonText = JSONValue.toJSONString(json);
-		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
-		//send the data to the server
-		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
-		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
-		nvps.add(new BasicNameValuePair("JSON", jsonText));
-		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
-		//get the response
-		CloseableHttpResponse response = httpclient.execute(httpPost);
-		try
-		{
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return null;
-		    }
-		    Object obj = JSONValue.parse(response_body);
-		    JSONObject response_json = (JSONObject) obj;
-		    String type;
-		    type = (String) response_json.get("type");
-		    if(!type.equals("fetch-response"))
-		    {
-		    	System.out.println("Error: Got the wrong response from the server!");
-		    	return null;
-		    }
-		    //get the array with the messages
-			JSONArray array = (JSONArray)response_json.get("messages");
-			for(int i = 0; i < array.size(); i++)
-			{
-				//store each encrypted mail into the vector
-				JSONObject jo = (JSONObject)array.get(i);
-				enc_key = (String)jo.get("key");
-				enc_from = (String)jo.get("from");
-				enc_time = (String)jo.get("time");
-				enc_message = (String)jo.get("msg");
-				Mail mail = new Mail(enc_key, enc_from, enc_time, enc_message);
-				mails.add(mail);
-			}
-		    // and ensure it is fully consumed
-		    EntityUtils.consume(entity);
+
+	    JSONObject response_json = sendToServer(jsonText);
+		if(response_json==null){
+			System.out.println("Error: Could not parse JSON from server!");
+			return null;
 		}
-		finally
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("fetch-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return null;
+	    }
+	    //get the array with the messages
+		JSONArray array = (JSONArray)response_json.get("messages");
+		for(int i = 0; i < array.size(); i++)
 		{
-		    response.close();
+			//store each encrypted mail into the vector
+			JSONObject jo = (JSONObject)array.get(i);
+			enc_key = (String)jo.get("key");
+			enc_from = (String)jo.get("from");
+			enc_time = (String)jo.get("time");
+			enc_message = (String)jo.get("msg");
+			Mail mail = new Mail(enc_key, enc_from, enc_time, enc_message);
+			mails.add(mail);
 		}
 		return mails;
 	}
