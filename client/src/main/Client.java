@@ -120,7 +120,7 @@ public class Client
 			case "-fetch": fetch_messages(); break;
 			case "-send": send_message(); break;
 			case "-publicKey": request_ServerKey(); break;
-			case "-login": logIn(); break;
+			//case "-login": logIn(); break;
 			case "-exit": System.out.println("Goodbye :) Have a nice day!"); return;
 			default: System.out.println("A command error occured :(");
 		}
@@ -130,7 +130,7 @@ public class Client
 	{
 		System.out.println("Command list: ");
 		System.out.print( "\t-publicKey\tfor requesting the servers public key (needed for all other commands)\n" +
-				"\t-login\t\tfor logging into the server with alias and password\n"+
+				//"\t-login\t\tfor logging into the server with alias and password\n"+
 				"\t-alias\t\tfor requesting an new alias\n" +
 				"\t-send\t\tfor sending a message to another user\n" +
 				"\t-fetch\t\tfor fetching all your mails from the server\n" +
@@ -158,7 +158,7 @@ public class Client
 		valid |= command.equals("-alias");
 		valid |= command.equals("-send");
 		valid |= command.equals("-fetch");
-		valid |= command.equals("-login");
+		//valid |= command.equals("-login");
 		valid |= command.equals("-publicKey");
 		valid |= command.equals("-exit");
 		return valid;
@@ -438,13 +438,13 @@ public class Client
 			startClient();
 			return;
 		}
-		if(identifier.isEmpty())
+		/*if(identifier.isEmpty())
 		{
 			System.out.println("ERROR: You need an alias before sending a message, so request one if you use the service " +
 					"for the first time or log in with your credentials");
 			startClient();
 			return;
-		}
+		}*/
 		String user_alias = new String();
 		String message = new String();
 		String answer = new String();
@@ -463,6 +463,18 @@ public class Client
 		boolean key_stored;
 		PublicKey user_key;
 		System.out.println("Sending a message to another user:");
+		System.out.println("Please enter your alias...");
+		while(is_valid == false)
+		{
+			identifier = readInput();
+			is_valid = checkAlias(identifier);
+			if(is_valid == false)
+			{
+				System.out.println("The given alias is not a valid alias!");
+				System.out.println("Please reenter your alias...");
+			}
+		}
+		is_valid = false;
 		System.out.println("Please enter the alias of the user you want to send the message to...");
 		while(is_valid == false)
 		{
@@ -543,7 +555,8 @@ public class Client
 			send_message = sendSendRequest(encrypted_recipient, encrypted_aes_key, encrypted_identifier, encrypted_message);
 			if(send_message == false)
 			{
-				System.out.println("Error while sending your message to the server!");
+				//Error printed out in the method itself
+				//System.out.println("Error while sending your message to the server!");
 			}
 			else
 			{
@@ -1453,6 +1466,12 @@ public class Client
 		    	return result;
 		    }
 		    result = (boolean) response_json.get("result");
+		    if(result == false)
+		    {
+		    	String fail_reason = (String) response_json.get("message");
+		    	System.out.println("Error while sending the message!");
+		    	System.out.println("Errorreason: " + fail_reason);
+		    }
 		    // and ensure it is fully consumed
 		    EntityUtils.consume(entity);
 		}
