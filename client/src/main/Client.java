@@ -1164,7 +1164,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_LOGIN);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
@@ -1215,7 +1215,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_SERVER_KEY);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
@@ -1296,7 +1296,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_ALIAS);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
@@ -1350,7 +1350,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_USER_KEY);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
@@ -1438,7 +1438,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_SEND);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
@@ -1500,7 +1500,7 @@ public class Client
 		System.out.println("Sending request: "+ jsonText); //TODO: remove if all is working
 		//send the data to the server
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS+Options.REQUEST_MESSAGES);
+		HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
 		List <NameValuePair> nvps = new ArrayList <NameValuePair>();
 		nvps.add(new BasicNameValuePair("JSON", jsonText));
 		httpPost.setEntity(new UrlEncodedFormEntity(nvps));
