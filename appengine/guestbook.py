@@ -64,6 +64,23 @@ class Greeting(ndb.Model):
 # [END greeting]
 
 
+# [START models]
+class Anonionmail(ndb.Model):
+    """Model for representing an email."""
+    recipient = ndb.StringProperty(indexed=True)
+    author = ndb.StringProperty(indexed=False)
+    date = ndb.DateTimeProperty(auto_now_add=True)
+    key = ndb.StringProperty(indexed=False)
+    message = ndb.StringProperty(indexed=False)
+    
+    
+class Pseudonym(ndb.Model):
+    """Model for representing a user."""
+    alias = ndb.StringProperty(indexed=True)
+    pubkey = ndb.StringProperty(indexed=False)
+    password = ndb.StringProperty(indexed=False)
+# [END models]
+
 # [START main_page]
 class MainPage(webapp2.RequestHandler):
 
@@ -105,16 +122,36 @@ class MainPage(webapp2.RequestHandler):
             return json.dumps(obj)
             
         def alias(jdata):
-            self.response.out.write(error("success"))
+            self.response.out.write(error("alias not implemented yet"))
+            return
+            
+        def keyreq(jdata):
+            self.response.out.write(error("key request not implemented yet"))
+            return
+            
+        def sendmail(jdata):
+            self.response.out.write(error("send not implemented yet"))
+            return
+            
+        def fetchmail(jdata):
+            self.response.out.write(error("fetch not implemented yet"))
+            return
+            
+        def login(jdata):
+            self.response.out.write(error("longin not implemented yet"))
+            return
+            
+        def serverkey(jdata):
+            self.response.out.write(error("sk not implemented yet"))
             return
             
         types = {
             'alias-request' : alias,
-            'public-key-request' : alias,
-            'send-request' : alias,
-            'fetch-request' : alias,
-            'login-request' : alias,
-            'serverKey-request' : alias,
+            'public-key-request' : keyreq,
+            'send-request' : sendmail,
+            'fetch-request' : fetchmail,
+            'login-request' : login,
+            'serverKey-request' : serverkey,
         }
             
         try:
