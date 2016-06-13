@@ -371,6 +371,7 @@ public class Client
 			return;
 		}
 		//encrypt the hash
+		System.out.println("password hash " +new String(pass_hash));
 		enc_hash_bytes = rsaEncryptData(pass_hash, publicKey_server);
 		if(enc_hash_bytes == null)
 		{
@@ -378,7 +379,9 @@ public class Client
 			startClient();
 			return;
 		}
+		System.out.println("password enc " +new String(enc_hash_bytes));
 		enc_hash = convertToBase64(enc_hash_bytes);
+		System.out.println("password base64 " +new String(enc_hash));
 		//encrypt the public key with the servers public key
 		encrypted_key = rsaEncryptPublicKey(publicRSAkey, publicKey_server);
 		String enc_mod_hex = convertToBase64(encrypted_key.getMod());
@@ -872,8 +875,6 @@ public class Client
 			Cipher rsa = Cipher.getInstance("RSA");
 			rsa.init(Cipher.ENCRYPT_MODE, key);
 			byte[] cryptData = rsa.doFinal(data);
-			System.out.println(cryptData.length);
-			System.out.println(new String(cryptData));
 			return cryptData;
 		}
 		catch (NoSuchAlgorithmException e)
@@ -1125,23 +1126,14 @@ public class Client
 
 	private String convertToBase64(byte[] bytes)
 	{
-		String b64 = new BASE64Encoder().encode(bytes);
+		String b64 = DatatypeConverter.printBase64Binary(bytes);
 		return b64;
 	}
 
 	private byte[] convertFromBase64(String b64)
 	{
-		byte[] bytes;
-		try
-		{
-			bytes = new BASE64Decoder().decodeBuffer(b64);
-			return bytes;
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
-		return null;
+		byte[] bytes = DatatypeConverter.parseBase64Binary(b64);
+		return bytes;
 	}
 
 	private void testBase64Converter()

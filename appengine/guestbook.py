@@ -86,7 +86,8 @@ class Anonionmail(ndb.Model):
 class Pseudonym(ndb.Model):
     """Model for representing a user."""
     alias = ndb.StringProperty(indexed=True)
-    pubkey = ndb.StringProperty(indexed=False)
+    pubkeymod = ndb.StringProperty(indexed=False)
+    pubkeyexp = ndb.StringProperty(indexed=False)
     password = ndb.StringProperty(indexed=False)
 # [END models]
 
@@ -127,16 +128,11 @@ class MainPage(webapp2.RequestHandler):
             key = open("key/anonionmail", "r").read()
             rsakey = RSA.importKey(key)
             raw_cipher_data = base64.b64decode(base64cypher)
-            print raw_cipher_data
-            print len(raw_cipher_data)
-            print " now decrypt" 
             decrypted = rsakey.decrypt(raw_cipher_data)
             #remove padding
             pos = decrypted.rfind('\x00')
             if pos > 0:
                 decrypted = decrypted[pos+1:]
-                print "cut at "
-                print pos
             print decrypted
             return decrypted
         
@@ -149,10 +145,13 @@ class MainPage(webapp2.RequestHandler):
             
         def alias(jdata):
             pname = decrypt(jdata['id'])
+            pwhash = decrypt(jdata['pw'])
+            mod = '1' #decrypt(jdata['pub']['modulus'])
+            exp = '1' #decrypt(jdata['pub']['pubExp'])
             query = Pseudonym.query(Pseudonym.alias==pname)
             exists = query.get() is not None
             if not exists:
-                p = Pseudonym(alias=pname, pubkey='DEADBEEF', password='12345') #TODO
+                p = Pseudonym(alias=pname, pubkeymod=mod,pubkeyexp=exp, password=pwhash) 
                 p.put()
             
             obj = {
