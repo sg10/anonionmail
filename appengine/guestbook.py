@@ -33,7 +33,10 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     autoescape=True)
     
 from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+
 import base64
+import traceback
 # [END imports]
 
 DEFAULT_GUESTBOOK_NAME = 'default_guestbook'
@@ -94,7 +97,11 @@ class Pseudonym(ndb.Model):
 # [START main_page]
 class MainPage(webapp2.RequestHandler):
 
+            
     def get(self):
+    
+            
+            
         guestbook_name = self.request.get('guestbook_name',
                                           DEFAULT_GUESTBOOK_NAME)
         greetings_query = Greeting.query(
@@ -123,6 +130,25 @@ class MainPage(webapp2.RequestHandler):
         
 
         self.response.headers['Content-Type'] = 'application/json'  
+        
+        
+        def toLong(bytestring):
+            ll = 0L
+            for b in bytestring:
+                ll <<= 8
+                ll += ord(b)
+            return ll
+        
+        def getKey(mod,exp):
+            return RSA.construct((toLong(mod), toLong(exp)))
+            
+        def encrypt(key, message):
+            cipher = PKCS1_OAEP.new(key)
+            ciphertxt = cipher.encrypt(message)
+            print ciphertxt
+            base64cipher = base64.b64encode(ciphertxt)
+            return base64cipher
+            
         
         def decrypt(base64cypher, removePadding=True, hasMessageLength=False):
             key = open("key/anonionmail", "r").read()
@@ -188,13 +214,36 @@ class MainPage(webapp2.RequestHandler):
                 self.response.out.write(error("user not found"))
                 return
                 
-            #frommodel.
+            
+            
+            pname = decrypt(jdata['id'])
+            print pname
+            query = Pseudonym.query(Pseudonym.alias==pname)
+            receivermodel = query.get()
+            if receivermodel is None:
+                self.response.out.write(error("sender not found"))
+                return
+            
+            userkey = getKey(receivermodel.pubkeymod, receivermodel.pubkeyexp)
+            print frommodel.alias
+            print [ord(x) for x in bytes(frommodel.alias)]
+            encfrom = encrypt(userkey,fromname)#frommodel.alias)
+            encmod1 = encrypt(userkey,frommodel.pubkeymod[0:200])
+            encmod2 = encrypt(userkey,frommodel.pubkeymod[200:])
+            encexp = encrypt(userkey,frommodel.pubkeyexp)
             
         
-        
-        
-        
-        
+            obj = {
+                'type': 'public-key-response', 
+                'from': encfrom,
+                'pub': 
+                {
+                    "modulus1":encmod1,
+                    "modulus2":encmod2,
+                    "pubExp":encexp
+                }
+            } 
+            self.response.out.write(json.dumps(obj))
             return
             
         def sendmail(jdata):
@@ -249,6 +298,7 @@ class MainPage(webapp2.RequestHandler):
         except Exception as err:
             print("error occured: {0}".format(err))
             self.response.out.write(error("due to security reasons no specific error message is provided"))
+            traceback.print_exc()
             return
             
         

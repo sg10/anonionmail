@@ -939,9 +939,9 @@ public class Client
 			byte[] enc_mod1 = rsaEncryptData(mod1l, key);
 			byte[] enc_mod2 = rsaEncryptData(mod2l, key);
 			byte[] enc_exp = rsaEncryptData(expl, key);
-			for(int i = 0; i<mod2.length;i++){
-				System.out.print(" "+mod2[i]);
-			}
+//			for(int i = 0; i<mod2.length;i++){
+//				System.out.print(" "+mod2[i]);
+//			}
 			
 			EncryptedRSAkey encKey = new EncryptedRSAkey(enc_mod1, enc_mod2, enc_exp);
 			return encKey;
@@ -1301,7 +1301,8 @@ public class Client
 	private PublicKey sendUserKeyRequest(String enc_alias, String enc_keyowner) throws IOException
 	{
 		String enc_key_owner; //the encrypted key owner from the server response
-	    String enc_modulus; //the encrypted modulus
+	    String enc_modulus1; //the encrypted modulus
+	    String enc_modulus2; //the encrypted modulus
 	    String enc_exponent;  //the encrypted exponent
 		//create the json object
 		Map json=new LinkedHashMap();
@@ -1315,52 +1316,52 @@ public class Client
 			System.out.println("Error: Could not parse JSON from server!");
 			return null;
 		}
-		/// TODO Andy is to busy to change that
-//	    
-//	    String type;
-//	    type = (String) response_json.get("type");
-//	    if(!type.equals("public-key-response"))
-//	    {
-//	    	System.out.println("Error: Got the wrong response from the server!");
-//	    	return null;
-//	    }
-//	    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
-//	    JSONObject pubKey = (JSONObject) response_json.get("pub");  //the encrypted public key
-//	    enc_modulus = (String) pubKey.get("modulus"); //the encrypted modulus in Base64
-//	    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in Base64
-//		byte[] enc_key_owner_bytes = convertFromBase64(enc_key_owner);
-//		byte[] key_owner_bytes = rsaDecryptData(enc_key_owner_bytes, privateRSAkey);
-//		System.out.println("Key Owner: " + new String(key_owner_bytes));
-//		//got the key encrypted with this users public key - so decrypt it first
-//		//Recreate the Encrypted Key Object
-//		byte[] enc_mod = convertFromBase64(enc_modulus);
-//		byte[] enc_exp = convertFromBase64(enc_exponent);
-//		EncryptedRSAkey enc_key = new EncryptedRSAkey(enc_mod, enc_exp);
-//		PublicKey userKey = rsaDecryptPublicKey(enc_key, privateRSAkey);
-//		//return the decrypted public key
-//		KeyFactory fact;
-//		try
-//		{	//TODO: delete this output if everything is working
-//			fact = KeyFactory.getInstance("RSA");
-//			RSAPublicKeySpec pub = fact.getKeySpec(userKey, RSAPublicKeySpec.class);
-//			byte[] modu = pub.getModulus().toByteArray();
-//			byte[] expo = pub.getPublicExponent().toByteArray();
-//			String modu_b64 = convertToBase64(modu);
-//			String expo_b64 = convertToBase64(expo);
-//			System.out.println("Modulus: " + modu_b64);
-//			System.out.println("PublicExponent: " + expo_b64);
-//		}
-//		catch (InvalidKeySpecException e)
-//		{
-//			e.printStackTrace();
-//		}
-//		catch (NoSuchAlgorithmException e)
-//		{
-//			e.printStackTrace();
-//		}
-//		return userKey;
+	    
+	    String type;
+	    type = (String) response_json.get("type");
+	    if(!type.equals("public-key-response"))
+	    {
+	    	System.out.println("Error: Got the wrong response from the server!");
+	    	return null;
+	    }
+	    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
+	    JSONObject pubKey = (JSONObject) response_json.get("pub");  //the encrypted public key
+	    enc_modulus1 = (String) pubKey.get("modulus1"); //the encrypted modulus in Base64
+	    enc_modulus2 = (String) pubKey.get("modulus2"); //the encrypted modulus in Base64
+	    enc_exponent = (String) pubKey.get("pubExp");  //the encrypted exponent in Base64
+		byte[] enc_key_owner_bytes = convertFromBase64(enc_key_owner);
+		byte[] key_owner_bytes = rsaDecryptData(enc_key_owner_bytes, privateRSAkey);
+		System.out.println("Key Owner: " + new String(key_owner_bytes));
+		//got the key encrypted with this users public key - so decrypt it first
+		//Recreate the Encrypted Key Object
+		byte[] enc_mod1 = convertFromBase64(enc_modulus1);
+		byte[] enc_mod2 = convertFromBase64(enc_modulus2);
+		byte[] enc_exp = convertFromBase64(enc_exponent);
+		EncryptedRSAkey enc_key = new EncryptedRSAkey(enc_mod1,enc_mod2, enc_exp);
+		PublicKey userKey = rsaDecryptPublicKey(enc_key, privateRSAkey);
+		//return the decrypted public key
+		KeyFactory fact;
+		try
+		{	//TODO: delete this output if everything is working
+			fact = KeyFactory.getInstance("RSA");
+			RSAPublicKeySpec pub = fact.getKeySpec(userKey, RSAPublicKeySpec.class);
+			byte[] modu = pub.getModulus().toByteArray();
+			byte[] expo = pub.getPublicExponent().toByteArray();
+			String modu_b64 = convertToBase64(modu);
+			String expo_b64 = convertToBase64(expo);
+			System.out.println("Modulus: " + modu_b64);
+			System.out.println("PublicExponent: " + expo_b64);
+		}
+		catch (InvalidKeySpecException e)
+		{
+			e.printStackTrace();
+		}
+		catch (NoSuchAlgorithmException e)
+		{
+			e.printStackTrace();
+		}
+		return userKey;
 		
-		return null;
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
