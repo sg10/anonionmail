@@ -79,16 +79,16 @@ class Anonionmail(ndb.Model):
     recipient = ndb.StringProperty(indexed=True)
     author = ndb.StringProperty(indexed=False)
     date = ndb.DateTimeProperty(auto_now_add=True)
-    key = ndb.StringProperty(indexed=False)
-    message = ndb.TextProperty(indexed=False)
+    key = ndb.BlobProperty(indexed=False)
+    message = ndb.BlobProperty(indexed=False)
     
     
 class Pseudonym(ndb.Model):
     """Model for representing a user."""
     alias = ndb.StringProperty(indexed=True)
-    pubkeymod = ndb.StringProperty(indexed=False)
-    pubkeyexp = ndb.StringProperty(indexed=False)
-    password = ndb.StringProperty(indexed=False)
+    pubkeymod = ndb.BlobProperty(indexed=False)
+    pubkeyexp = ndb.BlobProperty(indexed=False)
+    password = ndb.BlobProperty(indexed=False)
 # [END models]
 
 # [START main_page]
@@ -124,16 +124,23 @@ class MainPage(webapp2.RequestHandler):
 
         self.response.headers['Content-Type'] = 'application/json'  
         
-        def decrypt(base64cypher):
+        def decrypt(base64cypher, removePadding=True, hasMessageLength=False):
             key = open("key/anonionmail", "r").read()
             rsakey = RSA.importKey(key)
             raw_cipher_data = base64.b64decode(base64cypher)
             decrypted = rsakey.decrypt(raw_cipher_data)
             #remove padding
-            pos = decrypted.rfind('\x00')
-            if pos > 0:
-                decrypted = decrypted[pos+1:]
-            print decrypted
+            if removePadding:
+                if hasMessageLength:
+                    print "decoding with length" 
+                    length = ord(decrypted[-1])
+                    print length
+                    decrypted = decrypted[-(length+1):-1]
+                else:
+                    pos = decrypted.rfind('\x00')
+                    if pos > 0:
+                        decrypted = decrypted[pos+1:]
+            #print decrypted
             return decrypted
         
         def error(msg):
@@ -145,12 +152,22 @@ class MainPage(webapp2.RequestHandler):
             
         def alias(jdata):
             pname = decrypt(jdata['id'])
-            pwhash = decrypt(jdata['pw'])
-            mod = '1' #decrypt(jdata['pub']['modulus'])
-            exp = '1' #decrypt(jdata['pub']['pubExp'])
+            print pname
             query = Pseudonym.query(Pseudonym.alias==pname)
             exists = query.get() is not None
             if not exists:
+                pwhash = decrypt(jdata['pw'], False)
+                pwhash = pwhash[-32:] #only last 256 bits
+                #print pwhash
+                mod1 = decrypt(jdata['pub']['modulus1'], True, True)
+                mod2 = decrypt(jdata['pub']['modulus2'], True, True)
+                exp = decrypt(jdata['pub']['pubExp'], True, True)
+                
+                #print exp
+                #print [ord(x) for x in bytes(mod1)]
+                #print [ord(x) for x in bytes(mod2)]
+                mod = mod1+mod2
+                #print [ord(x) for x in bytes(mod)]
                 p = Pseudonym(alias=pname, pubkeymod=mod,pubkeyexp=exp, password=pwhash) 
                 p.put()
             
@@ -159,11 +176,25 @@ class MainPage(webapp2.RequestHandler):
                 'result': not exists,
             } 
             self.response.out.write(json.dumps(obj))
-            decrypt("DEADBEEF")
             return
             
         def keyreq(jdata):
-            self.response.out.write(error("key request not implemented yet"))
+        
+            fromname = decrypt(jdata['from'])
+            print fromname
+            query = Pseudonym.query(Pseudonym.alias==fromname)
+            frommodel = query.get()
+            if frommodel is None:
+                self.response.out.write(error("user not found"))
+                return
+                
+            #frommodel.
+            
+        
+        
+        
+        
+        
             return
             
         def sendmail(jdata):
