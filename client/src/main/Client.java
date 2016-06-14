@@ -123,8 +123,6 @@ public class Client
 			case "-alias": request_alias(); break;
 			case "-fetch": fetch_messages(); break;
 			case "-send": send_message(); break;
-			case "-publicKey": request_ServerKey(); break;
-			//case "-login": logIn(); break;
 			case "-exit": System.out.println("Goodbye :) Have a nice day!"); return;
 			default: System.out.println("A command error occured :(");
 		}
@@ -162,8 +160,6 @@ public class Client
 		valid |= command.equals("-alias");
 		valid |= command.equals("-send");
 		valid |= command.equals("-fetch");
-		//valid |= command.equals("-login");
-		valid |= command.equals("-publicKey");
 		valid |= command.equals("-exit");
 		return valid;
 	}
@@ -198,7 +194,7 @@ public class Client
 		return false;
 	}
 
-	private void logIn()
+	/*private void logIn()
 	{
 		if(publicKey_server == null)
 		{
@@ -277,7 +273,7 @@ public class Client
 			System.out.println("Alias and/or password wrong!");
 		}
 		startClient();
-	}
+	}*/
 
 	private void request_ServerKey()
 	{
@@ -293,7 +289,6 @@ public class Client
 				return;
 			}
 			System.out.println("Received public key!\n");
-			startClient();
 		}
 		catch (IOException e)
 		{
@@ -599,13 +594,6 @@ public class Client
 			startClient();
 			return;
 		}
-		if(identifier.isEmpty())
-		{
-			System.out.println("ERROR: You need an alias before sending a message, so request one if you use the service " +
-					"for the first time or log in with your credentials");
-			startClient();
-			return;
-		}
 		System.out.println("Fetching messages from the server:");
 		int message_count = 0;
 		String message;
@@ -630,6 +618,18 @@ public class Client
 		byte[] enc_hash_bytes;
 		Vector<Mail> mailList = new Vector<Mail>(); //enc mails from the server
 		Vector<Mail> dec_mails = new Vector<Mail>(); //dec mails for output
+		boolean is_valid = false;
+		System.out.println("Please enter your alias...");
+		while(is_valid == false)
+		{
+			identifier = readInput();
+			is_valid = checkAlias(identifier);
+			if(is_valid == false)
+			{
+				System.out.println("The given alias is not a valid alias!");
+				System.out.println("Please reenter your alias...");
+			}
+		}
 		System.out.println("Please enter your password...");
 		String password = readInput();
 		//hash the password
@@ -661,6 +661,12 @@ public class Client
 		try
 		{
 			mailList = sendFetchRequest(enc_alias, enc_hash);
+			if(mailList == null)
+			{
+				System.out.println("Error: Received no messages from the server!");
+				startClient();
+				return;
+			}
 		}
 		catch (IOException e)
 		{
@@ -1090,7 +1096,7 @@ public class Client
 		return null;
 	}
 
-	private boolean compareHashes(byte[] hash1, byte[] hash2)
+	/*private boolean compareHashes(byte[] hash1, byte[] hash2)
 	{
 		try
 		{
@@ -1102,27 +1108,7 @@ public class Client
 			e.printStackTrace();
 		}
 		return false;
-	}
-
-	private String convertToHex(byte[] bytes)
-	{
-		String hex = Hex.encodeHexString(bytes);
-		return hex;
-	}
-
-	private byte[] convertFromHex(String hex)
-	{
-		try
-		{
-			byte[] bytes = Hex.decodeHex(hex.toCharArray());
-			return bytes;
-		}
-		catch (DecoderException e)
-		{
-			e.printStackTrace();
-		}
-		return null;
-	}
+	}*/
 
 	private String convertToBase64(byte[] bytes)
 	{
@@ -1136,7 +1122,7 @@ public class Client
 		return bytes;
 	}
 
-	private void testBase64Converter()
+	/*private void testBase64Converter()
 	{
 		String s = "Frederik war hier";
 		byte[] array = s.getBytes();
@@ -1146,7 +1132,7 @@ public class Client
 		byte[] new_array = convertFromBase64(b64);
 		String newstring = new String(new_array);
 		System.out.println("Converted string: " + newstring);
-	}
+	}*/
 
 	
 	private JSONObject sendToServer(String json){
@@ -1194,13 +1180,12 @@ public class Client
 		return response_json;
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	/*@SuppressWarnings({ "unchecked", "rawtypes" })
 	private boolean sendLoginRequest(String enc_alias, String enc_password) throws IOException
 	{
 		boolean result = false;
 		//create the json object
 		Map json=new LinkedHashMap();
-		String response_body;
 		json.put("type","login-request");
 		json.put("id",enc_alias);
 		json.put("pw",enc_password);
@@ -1216,7 +1201,7 @@ public class Client
 	    }
 	    result = (boolean) response_json.get("result");
 		return result;
-	}
+	}*/
 
 	@SuppressWarnings("unchecked")
 	private PublicKey sendServerKeyRequest() throws IOException
