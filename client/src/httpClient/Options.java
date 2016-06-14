@@ -2,7 +2,7 @@ package httpClient;
 
 public class Options
 {
-	public static String SERVER_ADDRESS = "https://v2-dot-anonionmail.appspot.com/";//"http://localhost:8080/";
+	public static String SERVER_ADDRESS = "http://localhost:8080/";//"https://v2-dot-anonionmail.appspot.com/";//"http://localhost:8080/";
 	public static String REQUEST_ALIAS = "request_alias.txt";
 	public static String REQUEST_LOGIN = "login-request.txt";
 	public static String REQUEST_SERVER_KEY = "request_skey.txt";

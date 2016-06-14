@@ -702,10 +702,7 @@ public class Client
 				startClient();
 				return;
 			}
-			timestamp = new String(timestamp_bytes);
-			long unixTime = Long.parseLong(timestamp);
-			Date d = new Date(unixTime * 1000L);
-			String date = d.toString();
+			String date = new String(timestamp_bytes);
 			//decrypt the aes key
 			aes_key = rsaDecryptData(enc_aeskey_bytes, privateRSAkey);
 			if(aes_key == null)

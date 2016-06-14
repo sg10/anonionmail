@@ -40,36 +40,6 @@ import base64
 import traceback
 # [END imports]
 
-DEFAULT_GUESTBOOK_NAME = 'default_guestbook'
-
-
-# We set a parent key on the 'Greetings' to ensure that they are all
-# in the same entity group. Queries across the single entity group
-# will be consistent. However, the write rate should be limited to
-# ~1/second.
-
-def guestbook_key(guestbook_name=DEFAULT_GUESTBOOK_NAME):
-    """Constructs a Datastore key for a Guestbook entity.
-
-    We use guestbook_name as the key.
-    """
-    return ndb.Key('Guestbook', guestbook_name)
-
-
-# [START greeting]
-class Author(ndb.Model):
-    """Sub model for representing an author."""
-    identity = ndb.StringProperty(indexed=False)
-    email = ndb.StringProperty(indexed=False)
-
-
-class Greeting(ndb.Model):
-    """A main model for representing an individual Guestbook entry."""
-    author = ndb.StructuredProperty(Author)
-    content = ndb.StringProperty(indexed=False)
-    date = ndb.DateTimeProperty(auto_now_add=True)
-# [END greeting]
-
 
 # [START constants]
 PSEUDONYM_STORE_KEY = 'anonionmail_users'
@@ -83,8 +53,8 @@ class Anonionmail(ndb.Model):
     recipient = ndb.StringProperty(indexed=True)
     author = ndb.StringProperty(indexed=False)
     date = ndb.DateTimeProperty(auto_now_add=True)
-    key = ndb.BlobProperty(indexed=False)
-    message = ndb.BlobProperty(indexed=False)
+    key = ndb.StringProperty(indexed=False)
+    message = ndb.TextProperty(indexed=False)
     
     
 class Pseudonym(ndb.Model):
@@ -101,11 +71,9 @@ class MainPage(webapp2.RequestHandler):
             
     def get(self):
     
-            
         self.response.write("Welcome to AnONIONmail")
 
     def post(self):
-        
 
         self.response.headers['Content-Type'] = 'application/json'  
         
@@ -136,18 +104,6 @@ class MainPage(webapp2.RequestHandler):
             decrypted = cipher.decrypt(raw_cipher_data, None)
             if decrypted is None:
                 raise Exception('decryption failed')
-            #remove padding
-            #if removePadding:
-            #    if hasMessageLength:
-            #        print "decoding with length" 
-            #        length = ord(decrypted[-1])
-            #        print length
-            #        decrypted = decrypted[-(length+1):-1]
-            #    else:
-            #        pos = decrypted.rfind('\x00')
-            #        if pos > 0:
-            #            decrypted = decrypted[pos+1:]
-            #print decrypted
             return decrypted
         
         def error(msg):
@@ -196,8 +152,6 @@ class MainPage(webapp2.RequestHandler):
                 self.response.out.write(error("user not found"))
                 return
                 
-            
-            
             pname = decrypt(jdata['id'])
             print pname
             query = Pseudonym.query(Pseudonym.alias==pname)
@@ -207,8 +161,6 @@ class MainPage(webapp2.RequestHandler):
                 return
             
             userkey = getKey(receivermodel.pubkeymod, receivermodel.pubkeyexp)
-            print frommodel.alias
-            print [ord(x) for x in bytes(frommodel.alias)]
             encfrom = encrypt(userkey,fromname)#frommodel.alias)
             encmod1 = encrypt(userkey,frommodel.pubkeymod[0:200])
             encmod2 = encrypt(userkey,frommodel.pubkeymod[200:])
@@ -229,17 +181,81 @@ class MainPage(webapp2.RequestHandler):
             return
             
         def sendmail(jdata):
-            self.response.out.write(error("send not implemented yet"))
+        
+            def sendresponse(success, message):
+                obj = {
+                    'type': 'send-response', 
+                    'result': success,
+                    'message': message
+                } 
+                self.response.out.write(json.dumps(obj))
+        
+            fromname = decrypt(jdata['from'])
+            print fromname
+            query = Pseudonym.query(Pseudonym.alias==fromname)
+            frommodel = query.get()
+            if frommodel is None:
+                sendresponse(False,'sender not valid')
+                return
+                
+            toname = decrypt(jdata['to'])
+            print toname
+            query = Pseudonym.query(Pseudonym.alias==toname)
+            tomodel = query.get()
+            if tomodel is None:
+                sendresponse(False,'receiver not found')
+                return
+                
+            keytostore = jdata['key']
+            messagetostore = jdata['msg']
+            
+            mail = Anonionmail(recipient=toname, author=fromname,key=keytostore, message=messagetostore) 
+            mail.put()
+            
+            sendresponse(True,'mail received')
+            
             return
             
         def fetchmail(jdata):
-            self.response.out.write(error("fetch not implemented yet"))
-            return
+            pname = decrypt(jdata['to'])
+            print pname
+            query = Pseudonym.query(Pseudonym.alias==pname)
+            receivermodel = query.get()
+            if receivermodel is None:
+                self.response.out.write(error("user not found"))
+                return
+                
+            pwhash = decrypt(jdata['pw'])
+            if not (pwhash == receivermodel.password):
+                self.response.out.write(error("wrong password"))
+                return
+                
+            query = Anonionmail.query(Anonionmail.recipient == pname)
+            mails = query.fetch(20)
             
-        def login(jdata):
-            query = Pseudonym.query(ancestor=PSEUDONYM_STORE_KEY).order(-Greeting.date)
-            greetings = greetings_query.fetch(10)
-            self.response.out.write(error("longin not implemented yet"))
+            
+            userkey = getKey(receivermodel.pubkeymod, receivermodel.pubkeyexp)
+            
+            maillist = []
+            for mail in mails:
+                encauthor = encrypt(userkey,str(mail.author))
+                enctime = encrypt(userkey,str(mail.date))
+                mobj = {
+                    'key': mail.key, 
+                    'from': encauthor,
+                    'msg': mail.message,
+                    'time': enctime
+                } 
+                maillist.append(mobj)
+                print mail.author
+                
+            
+            obj = {
+                'type': 'fetch-response', 
+                'messages': maillist
+            } 
+            print obj
+            self.response.out.write(json.dumps(obj))
             return
             
         def serverkey(jdata):
@@ -266,7 +282,6 @@ class MainPage(webapp2.RequestHandler):
             'public-key-request' : keyreq,
             'send-request' : sendmail,
             'fetch-request' : fetchmail,
-            'login-request' : login,
             'serverKey-request' : serverkey,
         }
             
