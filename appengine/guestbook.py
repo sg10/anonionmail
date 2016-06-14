@@ -26,11 +26,6 @@ import webapp2
 
 import json
 import cgi
-
-JINJA_ENVIRONMENT = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
-    extensions=['jinja2.ext.autoescape'],
-    autoescape=True)
     
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -132,7 +127,6 @@ class MainPage(webapp2.RequestHandler):
         def encrypt(key, message):
             cipher = PKCS1_v1_5.new(key)#PKCS1_OAEP.new(key)
             ciphertxt = cipher.encrypt(message)
-            print ciphertxt
             base64cipher = base64.b64encode(ciphertxt)
             return base64cipher
             
@@ -156,23 +150,15 @@ class MainPage(webapp2.RequestHandler):
             
         def alias(jdata):
             pname = decrypt(jdata['id'])
-            print pname
             query = Pseudonym.query(Pseudonym.alias==pname)
             exists = query.get() is not None
             if not exists:
                 pwhash = decrypt(jdata['pw'])
-                #print pwhash
-                #pwhash = pwhash[-32:] #only last 256 bits
-                #print pwhash
                 mod1 = decrypt(jdata['pub']['modulus1'],)
                 mod2 = decrypt(jdata['pub']['modulus2'])
                 exp = decrypt(jdata['pub']['pubExp'])
                 
-                #print exp
-                #print [ord(x) for x in bytes(mod1)]
-                #print [ord(x) for x in bytes(mod2)]
                 mod = mod1+mod2
-                #print [ord(x) for x in bytes(mod)]
                 p = Pseudonym(alias=pname, pubkeymod=mod,pubkeyexp=exp, password=pwhash) 
                 p.put()
             
@@ -186,7 +172,6 @@ class MainPage(webapp2.RequestHandler):
         def keyreq(jdata):
         
             fromname = decrypt(jdata['from'])
-            print fromname
             query = Pseudonym.query(Pseudonym.alias==fromname)
             frommodel = query.get()
             if frommodel is None:
@@ -194,7 +179,6 @@ class MainPage(webapp2.RequestHandler):
                 return
                 
             pname = decrypt(jdata['id'])
-            print pname
             query = Pseudonym.query(Pseudonym.alias==pname)
             receivermodel = query.get()
             if receivermodel is None:
@@ -232,7 +216,6 @@ class MainPage(webapp2.RequestHandler):
                 self.response.out.write(json.dumps(obj))
         
             fromname = decrypt(jdata['from'])
-            print fromname
             query = Pseudonym.query(Pseudonym.alias==fromname)
             frommodel = query.get()
             if frommodel is None:
@@ -240,7 +223,6 @@ class MainPage(webapp2.RequestHandler):
                 return
                 
             toname = decrypt(jdata['to'])
-            print toname
             query = Pseudonym.query(Pseudonym.alias==toname)
             tomodel = query.get()
             if tomodel is None:
@@ -259,7 +241,6 @@ class MainPage(webapp2.RequestHandler):
             
         def fetchmail(jdata):
             pname = decrypt(jdata['to'])
-            print pname
             query = Pseudonym.query(Pseudonym.alias==pname)
             receivermodel = query.get()
             if receivermodel is None:
@@ -288,24 +269,18 @@ class MainPage(webapp2.RequestHandler):
                     'time': enctime
                 } 
                 maillist.append(mobj)
-                print mail.author
                 
             
             obj = {
                 'type': 'fetch-response', 
                 'messages': maillist
             } 
-            print obj
             self.response.out.write(json.dumps(obj))
             return
             
         def serverkey(jdata):
             key = open("key/anonionmail.pub", "r").read()
             rsakey = RSA.importKey(key)
-            import struct
-            print rsakey.n
-            print rsakey.e
-            print struct.pack("I", rsakey.e)
             obj = {
                 'type': 'serverKey-response', 
                 'pubKey': 
@@ -328,11 +303,10 @@ class MainPage(webapp2.RequestHandler):
             
         try:
             incomming = cgi.escape(self.request.body)
-            print incomming
+            #print incomming
             jdata = json.loads(incomming)
             reqtype = jdata['type']
             types[reqtype](jdata)
-            print reqtype
         except Exception as err:
             print("error occured: {0}".format(err))
             self.response.out.write(error("due to security reasons no specific error message is provided"))
@@ -347,35 +321,10 @@ class MainPage(webapp2.RequestHandler):
 # [END main_page]
 
 
-# [START guestbook]
-class Guestbook(webapp2.RequestHandler):
-
-    def post(self):
-        # We set the same parent key on the 'Greeting' to ensure each
-        # Greeting is in the same entity group. Queries across the
-        # single entity group will be consistent. However, the write
-        # rate to a single entity group should be limited to
-        # ~1/second.
-        guestbook_name = self.request.get('guestbook_name',
-                                          DEFAULT_GUESTBOOK_NAME)
-        greeting = Greeting(parent=guestbook_key(guestbook_name))
-
-        if users.get_current_user():
-            greeting.author = Author(
-                    identity=users.get_current_user().user_id(),
-                    email=users.get_current_user().email())
-
-        greeting.content = self.request.get('content')
-        greeting.put()
-
-        query_params = {'guestbook_name': guestbook_name}
-        self.redirect('/?' + urllib.urlencode(query_params))
-# [END guestbook]
 
 
 # [START app]
 app = webapp2.WSGIApplication([
     ('/', MainPage),
-    ('/sign', Guestbook),
 ], debug=True)
 # [END app]
