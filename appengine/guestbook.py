@@ -102,30 +102,7 @@ class MainPage(webapp2.RequestHandler):
     def get(self):
     
             
-            
-        guestbook_name = self.request.get('guestbook_name',
-                                          DEFAULT_GUESTBOOK_NAME)
-        greetings_query = Greeting.query(
-            ancestor=guestbook_key(guestbook_name)).order(-Greeting.date)
-        greetings = greetings_query.fetch(10)
-
-        user = users.get_current_user()
-        if user:
-            url = users.create_logout_url(self.request.uri)
-            url_linktext = 'Logout'
-        else:
-            url = users.create_login_url(self.request.uri)
-            url_linktext = 'Login'
-
-        template_values = {
-            'user': user,
-            'greetings': greetings,
-            'guestbook_name': urllib.quote_plus(guestbook_name),
-            'url': url,
-            'url_linktext': url_linktext,
-        }
-        template = JINJA_ENVIRONMENT.get_template('index.html')
-        self.response.write(template.render(template_values))
+        self.response.write("Welcome to AnONIONmail")
 
     def post(self):
         
@@ -187,9 +164,9 @@ class MainPage(webapp2.RequestHandler):
             exists = query.get() is not None
             if not exists:
                 pwhash = decrypt(jdata['pw'])
-                print pwhash
-                pwhash = pwhash[-32:] #only last 256 bits
-                print pwhash
+                #print pwhash
+                #pwhash = pwhash[-32:] #only last 256 bits
+                #print pwhash
                 mod1 = decrypt(jdata['pub']['modulus1'],)
                 mod2 = decrypt(jdata['pub']['modulus2'])
                 exp = decrypt(jdata['pub']['pubExp'])

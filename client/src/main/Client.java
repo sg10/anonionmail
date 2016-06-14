@@ -1152,6 +1152,7 @@ public class Client
 		    	System.out.println("Error: Got no information from the server!");
 		    	return null;
 		    }
+		    System.out.println(response_body);
 		    Object obj = JSONValue.parse(response_body);
 		    response_json = (JSONObject) obj;
 			// and ensure it is fully consumed
