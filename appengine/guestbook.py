@@ -71,7 +71,48 @@ class MainPage(webapp2.RequestHandler):
             
     def get(self):
     
-        self.response.write("Welcome to AnONIONmail")
+        def toLong(bytestring):
+            ll = 0L
+            for b in bytestring:
+                ll <<= 8
+                ll += ord(b)
+            return ll
+    
+        self.response.write("<h1>Welcome to AnONIONmail</h1>")
+        self.response.write("<h2>Mails</h2>")
+        self.response.write("<table><tr><td>Sender</td><td>Receiver</td><td>Time</td><td>Message</td><td>Key</td></tr>")
+        
+        query = Anonionmail.query()
+        mails = query.fetch(100)
+        for mail in mails:
+            self.response.write("<tr><td>")
+            self.response.write(str(mail.author))
+            self.response.write("</td><td>")
+            self.response.write(str(mail.recipient))
+            self.response.write("</td><td>")
+            self.response.write(str(mail.date))
+            self.response.write("</td><td>")
+            self.response.write(str(mail.message))
+            self.response.write("</td><td>")
+            self.response.write(str(mail.key))
+            self.response.write("</td></tr>")
+            
+        self.response.write("</table>")
+        
+        self.response.write("<h2>Users</h2>")
+        self.response.write("<table><tr><td>Pseudonym</td><td>Password Hash</td><td>public exponent</td><td>modulus</td></tr>")
+        query = Pseudonym.query()
+        names = query.fetch(20)
+        for user in names:
+            self.response.write("<tr><td>")
+            self.response.write(str(user.alias))
+            self.response.write("</td><td>")
+            self.response.write(str(user.password))
+            self.response.write("</td><td>")
+            self.response.write(toLong(user.pubkeyexp))
+            self.response.write("</td><td>")
+            self.response.write(toLong(user.pubkeymod))
+            self.response.write("</td></tr>")
 
     def post(self):
 
