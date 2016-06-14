@@ -910,13 +910,6 @@ public class Client
 		return null;
 	}
 	
-	private byte[] encodeLength(byte[] src){
-		byte[] expl = new byte[src.length+1];
-		System.arraycopy(src, 0, expl, 0, src.length);
-		expl[src.length] = (byte) src.length; 
-		return expl;
-	}
-
 	private EncryptedRSAkey rsaEncryptPublicKey(PublicKey data, PublicKey key)
 	{
 		try
@@ -928,20 +921,9 @@ public class Client
 			byte[] mod1 = Arrays.copyOfRange(mod, 0, 200);
 			byte[] mod2 = Arrays.copyOfRange(mod, 200, mod.length);
 			
-			// encode length 
-			byte[] expl = encodeLength(exp);
-			byte[] mod1l = encodeLength(mod1);
-			byte[] mod2l = encodeLength(mod2);
-
-			System.out.println(mod1l.length+" "+mod2l.length);
-			System.out.println(mod1l[mod1l.length-1]+" "+mod2l[mod2l.length-1]);
-			
-			byte[] enc_mod1 = rsaEncryptData(mod1l, key);
-			byte[] enc_mod2 = rsaEncryptData(mod2l, key);
-			byte[] enc_exp = rsaEncryptData(expl, key);
-//			for(int i = 0; i<mod2.length;i++){
-//				System.out.print(" "+mod2[i]);
-//			}
+			byte[] enc_mod1 = rsaEncryptData(mod1, key);
+			byte[] enc_mod2 = rsaEncryptData(mod2, key);
+			byte[] enc_exp = rsaEncryptData(exp, key);
 			
 			EncryptedRSAkey encKey = new EncryptedRSAkey(enc_mod1, enc_mod2, enc_exp);
 			return encKey;

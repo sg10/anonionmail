@@ -151,22 +151,25 @@ class MainPage(webapp2.RequestHandler):
             return base64cipher
             
         
-        def decrypt(base64cypher, removePadding=True, hasMessageLength=False):
+        def decrypt(base64cypher):#, removePadding=True, hasMessageLength=False):
             key = open("key/anonionmail", "r").read()
             rsakey = RSA.importKey(key)
+            cipher = PKCS1_v1_5.new(rsakey)
             raw_cipher_data = base64.b64decode(base64cypher)
-            decrypted = rsakey.decrypt(raw_cipher_data)
+            decrypted = cipher.decrypt(raw_cipher_data, None)
+            if decrypted is None:
+                raise Exception('decryption failed')
             #remove padding
-            if removePadding:
-                if hasMessageLength:
-                    print "decoding with length" 
-                    length = ord(decrypted[-1])
-                    print length
-                    decrypted = decrypted[-(length+1):-1]
-                else:
-                    pos = decrypted.rfind('\x00')
-                    if pos > 0:
-                        decrypted = decrypted[pos+1:]
+            #if removePadding:
+            #    if hasMessageLength:
+            #        print "decoding with length" 
+            #        length = ord(decrypted[-1])
+            #        print length
+            #        decrypted = decrypted[-(length+1):-1]
+            #    else:
+            #        pos = decrypted.rfind('\x00')
+            #        if pos > 0:
+            #            decrypted = decrypted[pos+1:]
             #print decrypted
             return decrypted
         
@@ -183,12 +186,13 @@ class MainPage(webapp2.RequestHandler):
             query = Pseudonym.query(Pseudonym.alias==pname)
             exists = query.get() is not None
             if not exists:
-                pwhash = decrypt(jdata['pw'], False)
+                pwhash = decrypt(jdata['pw'])
+                print pwhash
                 pwhash = pwhash[-32:] #only last 256 bits
-                #print pwhash
-                mod1 = decrypt(jdata['pub']['modulus1'], True, True)
-                mod2 = decrypt(jdata['pub']['modulus2'], True, True)
-                exp = decrypt(jdata['pub']['pubExp'], True, True)
+                print pwhash
+                mod1 = decrypt(jdata['pub']['modulus1'],)
+                mod2 = decrypt(jdata['pub']['modulus2'])
+                exp = decrypt(jdata['pub']['pubExp'])
                 
                 #print exp
                 #print [ord(x) for x in bytes(mod1)]
