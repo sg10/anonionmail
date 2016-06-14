@@ -34,6 +34,7 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Cipher import PKCS1_v1_5
 
 import base64
 import traceback
@@ -143,7 +144,7 @@ class MainPage(webapp2.RequestHandler):
             return RSA.construct((toLong(mod), toLong(exp)))
             
         def encrypt(key, message):
-            cipher = PKCS1_OAEP.new(key)
+            cipher = PKCS1_v1_5.new(key)#PKCS1_OAEP.new(key)
             ciphertxt = cipher.encrypt(message)
             print ciphertxt
             base64cipher = base64.b64encode(ciphertxt)
