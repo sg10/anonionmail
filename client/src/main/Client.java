@@ -104,10 +104,10 @@ public class Client
 		}
 		switch(command)
 		{
-			case "-alias": request_alias(); break;
-			case "-fetch": fetch_messages(); break;
-			case "-send": send_message(); break;
-			case "-exit": System.out.println("Goodbye :) Have a nice day!"); return;
+			case "a": request_alias(); break;
+			case "f": fetch_messages(); break;
+			case "s": send_message(); break;
+			case "e": System.out.println("Goodbye :) Have a nice day!"); return;
 			default: System.out.println("A command error occured :(");
 		}
 	}
@@ -115,10 +115,10 @@ public class Client
 	private void printOptions()
 	{
 		System.out.println("Command list: ");
-		System.out.print( "\t-alias\t\tfor requesting an new alias\n" +
-				"\t-send\t\tfor sending a message to another user\n" +
-				"\t-fetch\t\tfor fetching all your mails from the server\n" +
-				"\t-exit\t\tfor exiting this application\n\n");
+		System.out.print( "\ta\t--\trequest an new alias\n" +
+				"\ts\t--\tsend a message to another user\n" +
+				"\tf\t--\tfetch all your mails from the server\n" +
+				"\te\t--\texit this application\n\n");
 	}
 
 	private String readInput()
@@ -139,10 +139,10 @@ public class Client
 	private boolean checkCommand(String command)
 	{
 		boolean valid = false;
-		valid |= command.equals("-alias");
-		valid |= command.equals("-send");
-		valid |= command.equals("-fetch");
-		valid |= command.equals("-exit");
+		valid |= command.equals("a");
+		valid |= command.equals("s");
+		valid |= command.equals("f");
+		valid |= command.equals("e");
 		return valid;
 	}
 
@@ -177,7 +177,6 @@ public class Client
 			if(publicKey_server == null)
 			{
 				System.out.println("Error while requesting public key from the server!");
-				startClient();
 				return;
 			}
 			System.out.println("Received public key!\n");
