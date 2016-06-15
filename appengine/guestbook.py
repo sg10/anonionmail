@@ -74,6 +74,7 @@ class MainPage(webapp2.RequestHandler):
             return ll
     
         self.response.write("<h1>Welcome to AnONIONmail</h1>")
+        self.response.write("<p>version 3</p>")
         self.response.write("<h2>Mails</h2>")
         self.response.write("<table><tr><td>Sender</td><td>Receiver</td><td>Time</td><td>Message</td><td>Key</td></tr>")
         

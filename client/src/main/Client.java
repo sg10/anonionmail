@@ -80,7 +80,10 @@ public class Client
 			System.out.println("Using stored RSA keypair...");
 			readKeysFromFile();
 		}
+		
+		System.out.println("Using proxy "+Options.PROXY_ADDRESS);
 		request_ServerKey();
+		
 	}
 
 	public void startClient()
@@ -956,7 +959,8 @@ public class Client
 		try
 		{
 			CloseableHttpClient httpclient = HttpClients.createDefault();
-			HttpPost httpPost = new HttpPost(Options.SERVER_ADDRESS);
+			HttpPost httpPost = new HttpPost(Options.PROXY_ADDRESS);
+			httpPost.setHeader("Host", Options.SERVER_ADDRESS);
 			StringEntity sentity = new StringEntity(json);
 			sentity.setContentType(new BasicHeader("Content-Type",
 	        "application/json"));
