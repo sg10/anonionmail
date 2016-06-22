@@ -15,8 +15,11 @@ accessed via a Tor Hidden Service proxy to guarantee a higher level of anonymity
 ## Subdirectories
 
 `appengine`: Python App for Google App Engine
+
 `client`: Java client
+
 `vm`: configuration commands for the machine running the hidden service
+
 
 ## Server Communication
 The JSON protocol is used to transmit data between the client and the server.
