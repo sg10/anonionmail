@@ -3,6 +3,7 @@ package main;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.Console;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -60,6 +61,7 @@ import httpClient.Options;
 public class Client
 {
 	private String identifier = new String();
+	private String cur_password = new String();
 	private Vector<AliasKey> user_key_list;
 	private PrivateKey privateRSAkey;
 	private PublicKey publicRSAkey;
@@ -83,7 +85,6 @@ public class Client
 		
 		System.out.println("Using proxy "+Options.PROXY_ADDRESS);
 		request_ServerKey();
-		
 	}
 
 	public void startClient()
@@ -114,6 +115,11 @@ public class Client
 
 	private void printOptions()
 	{
+		System.out.println("\n-anONIONmail-");
+		if(!identifier.isEmpty())
+		{
+			System.out.println("Currently identified as '" + identifier + "'.");
+		}
 		System.out.println("Command list: ");
 		System.out.print( "\ta\t--\trequest an new alias\n" +
 				"\ts\t--\tsend a message to another user\n" +
@@ -131,7 +137,59 @@ public class Client
 		}
 		catch (IOException e)
 		{
-			e.printStackTrace();
+			System.out.println("Error while reading your console input!");
+			//e.printStackTrace();
+		}
+		return input_string;
+	}
+	
+	private String readPassword()
+	{
+		Console console = System.console();
+		String input_string = "ERROR";
+		if(console == null)
+		{
+			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+			try
+			{
+				input_string = br.readLine();
+			}
+			catch (IOException e)
+			{
+				//e.printStackTrace();
+			}
+		}
+		else
+		{
+			char[] pw = console.readPassword();
+			input_string = new String(pw);
+		}
+		return input_string;
+	}
+	
+	private String readMessage()
+	{
+		String input_string = new String();
+		boolean end = false;
+		while(end == false)
+		{
+			String temp = readInput();
+			if(temp.length() == 0)
+			{
+				temp = readInput();
+				if(temp.length() == 0)
+				{
+					end = true;
+				}
+				else
+				{
+					input_string = input_string + "\n\t";
+				}
+			}
+			else
+			{
+				input_string = input_string + temp + "\n\t";
+			}
 		}
 		return input_string;
 	}
@@ -166,6 +224,14 @@ public class Client
 		}
 		return true;
 	}
+	
+	private boolean checkPassword(String pw)
+	{
+		int length = pw.length();
+		if(length < 4)
+			return false;
+		return true;
+	}
 
 	private void request_ServerKey()
 	{
@@ -197,7 +263,8 @@ public class Client
 		}
 		String alias = new String();
 		String encrypted_alias;
-		String password;
+		String password = new String();
+		String password2;
 		String enc_hash;
 		EncryptedRSAkey encrypted_key;
 		byte[] enc_alias_bytes;
@@ -226,8 +293,29 @@ public class Client
 			return;
 		}
 		encrypted_alias = DatatypeConverter.printBase64Binary(enc_alias_bytes);
+		is_valid = false;
 		System.out.println("Please enter your desired password...");
-		password = readInput();
+		while(is_valid == false)
+		{
+			password = readPassword();
+			is_valid = checkPassword(password);
+			if(is_valid == false)
+			{
+				System.out.println("The given password is too short. Please insert at least 4 character!");
+			}
+		}
+		System.out.println("Please confirm your password: ");
+		password2 = readPassword();
+		if(!password.equals(password2))
+		{
+			System.out.println("Error: The entered passwords do not match!");
+			startClient();
+			return;
+		}
+		else
+		{
+			cur_password = password;
+		}
 		//hash the password
 		pass_hash = createHash(password.getBytes());
 		if(pass_hash == null)
@@ -280,7 +368,7 @@ public class Client
 		}
 	}
 
-	private void request_UserKey(String enc_identifier, String enc_keyowner, String keyowner)
+	private boolean request_UserKey(String enc_identifier, String enc_keyowner, String keyowner)
 	{
 		System.out.println("...requesting the public key from the user...");
 		PublicKey user_key;
@@ -290,17 +378,19 @@ public class Client
 			if(user_key == null)
 			{
 				System.out.println("Error while requesting the users public key!");
-				return;
+				return false;
 			}
 			//store the new alias-key pair
 			AliasKey ak = new AliasKey(keyowner, user_key);
 			user_key_list.add(ak);
 			System.out.println("Received public key for '" + keyowner + "'!\n");
+			return true;
 		}
 		catch (IOException e)
 		{
 			System.out.println("Error while sending user key request!");
-			e.printStackTrace();
+			//e.printStackTrace();
+			return false;
 		}
 	}
 
@@ -327,9 +417,10 @@ public class Client
 		boolean is_valid = false;
 		boolean send_message;
 		boolean key_stored;
+		boolean got_key;
 		PublicKey user_key;
 		System.out.println("Sending a message to another user:");
-		if(identifier == null)
+		if(identifier.isEmpty())
 		{
 			System.out.println("Please enter your alias...");
 			while(is_valid == false)
@@ -378,10 +469,16 @@ public class Client
 		if(key_stored == false)
 		{
 			//if not then request it
-			request_UserKey(encrypted_identifier, encrypted_recipient, user_alias);
+			got_key = request_UserKey(encrypted_identifier, encrypted_recipient, user_alias);
+			if(got_key == false)
+			{
+				startClient();
+				return;
+			}
 		}
-		System.out.println("Please enter the message now...(without linebreaks)");
-		message = readInput();
+		System.out.println("Please enter the message now...(3 new lines to end)");
+		message = readMessage();
+		//System.out.println("This is the message:\n" + message);
 		user_key = getKeyOfUser(user_alias); //RSA public key of the user
 		if(user_key == null)
 		{
@@ -420,7 +517,8 @@ public class Client
 		}
 		catch (IOException e)
 		{
-			e.printStackTrace();
+			System.out.println("Unexpected error while sending the message to the server!");
+			//e.printStackTrace();
 		}
 		startClient();
 	}
@@ -450,6 +548,7 @@ public class Client
 		System.out.println("Fetching messages from the server:");
 		int message_count = 0;
 		String message;
+		String password;
 		String date; //the time field
 		String sender; //the from field
 		String enc_alias;
@@ -472,19 +571,35 @@ public class Client
 		Vector<Mail> mailList = new Vector<Mail>(); //enc mails from the server
 		Vector<Mail> dec_mails = new Vector<Mail>(); //dec mails for output
 		boolean is_valid = false;
-		System.out.println("Please enter your alias...");
-		while(is_valid == false)
+		if(!identifier.isEmpty())
 		{
-			identifier = readInput();
-			is_valid = checkAlias(identifier);
-			if(is_valid == false)
+			System.out.println("Using alias '" + identifier + "'...");
+		}
+		else
+		{
+			System.out.println("Please enter your alias...");
+			while(is_valid == false)
 			{
-				System.out.println("The given alias is not a valid alias!");
-				System.out.println("Please reenter your alias...");
+				identifier = readInput();
+				is_valid = checkAlias(identifier);
+				if(is_valid == false)
+				{
+					System.out.println("The given alias is not a valid alias!");
+					System.out.println("Please reenter your alias...");
+				}
 			}
 		}
-		System.out.println("Please enter your password...");
-		String password = readInput();
+		if(!cur_password.isEmpty())
+		{
+			System.out.println("Using stored password...");
+			password = cur_password;
+		}
+		else
+		{
+			System.out.println("Please enter your password...");
+			password = readPassword();
+			cur_password = password;
+		}
 		//hash the password
 		pass_hash = createHash(password.getBytes());
 		if(pass_hash == null)
@@ -516,7 +631,7 @@ public class Client
 			mailList = sendFetchRequest(enc_alias, enc_hash);
 			if(mailList == null)
 			{
-				System.out.println("Error: Received no messages from the server!");
+				System.out.println("Received no messages from the server for '" + identifier + "'!");
 				startClient();
 				return;
 			}
@@ -524,7 +639,7 @@ public class Client
 		catch (IOException e)
 		{
 			System.out.println("Error while retrieving messages from server!");
-			e.printStackTrace();
+			//e.printStackTrace();
 			startClient();
 			return;
 		}
@@ -630,7 +745,7 @@ public class Client
 		catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e)
 		{
 			System.out.println("Unexpected error while generating RSA keys");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 	}
 
@@ -736,27 +851,27 @@ public class Client
 		catch (NoSuchAlgorithmException e)
 		{
 			System.out.println("Encryption error: Invalid Algorithm - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (NoSuchPaddingException e)
 		{
 			System.out.println("Encryption error: Invalid Padding - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (InvalidKeyException e)
 		{
 			System.out.println("Encryption error: Invalid key - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (IllegalBlockSizeException e)
 		{
 			System.out.println("Encryption error: Invalid block size - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (BadPaddingException e)
 		{
 			System.out.println("Encryption error: Bad Padding - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -782,11 +897,11 @@ public class Client
 		catch (NoSuchAlgorithmException e)
 		{
 			System.out.println("Encryption error: Invalid Algorithm - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (InvalidKeySpecException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -819,11 +934,11 @@ public class Client
 		}
 		catch (InvalidKeySpecException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -840,27 +955,27 @@ public class Client
 		catch (NoSuchAlgorithmException e)
 		{
 			System.out.println("Encryption error: Invalid Algorithm - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (NoSuchPaddingException e)
 		{
 			System.out.println("Encryption error: Invalid Padding - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (InvalidKeyException e)
 		{
 			System.out.println("Encryption error: Invalid key - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (IllegalBlockSizeException e)
 		{
 			System.out.println("Encryption error: Invalid block size - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (BadPaddingException e)
 		{
 			System.out.println("Encryption error: Bad Padding - RSA");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -885,30 +1000,30 @@ public class Client
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (NoSuchPaddingException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (InvalidKeyException e)
 		{
 			System.out.println("Encryption error: Invalid key - AES");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (IllegalBlockSizeException e)
 		{
 			System.out.println("Encryption error: Invalid block size - AES");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (BadPaddingException e)
 		{
 			System.out.println("Encryption error: Bad Padding - AES");
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (InvalidAlgorithmParameterException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -932,7 +1047,8 @@ public class Client
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			e.printStackTrace();
+			System.out.println("Unexpected error while hashing!");
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -955,42 +1071,56 @@ public class Client
 		//send the data to the server
 		CloseableHttpResponse response = null;
 		JSONObject response_json = null;
-		try
+		boolean connected = false;
+		int tries = 0;
+		while((connected == false) && (tries < 5))
 		{
-			CloseableHttpClient httpclient = HttpClients.createDefault();
-			HttpPost httpPost = new HttpPost(Options.PROXY_ADDRESS);
-			httpPost.setHeader("Host", Options.SERVER_ADDRESS);
-			StringEntity sentity = new StringEntity(json);
-			sentity.setContentType(new BasicHeader("Content-Type",
-	        "application/json"));
-			httpPost.setEntity(sentity);
-			//get the response
-			response = httpclient.execute(httpPost);
-			String response_body;
-		    System.out.println("Server connection: " + response.getStatusLine() + "\n");
-		    HttpEntity entity = response.getEntity();
-		    // do something useful with the response body
-		    BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-		    response_body = rd.readLine();
-		    if(response_body == null)
-		    {
-		    	System.out.println("Error: Got no information from the server!");
-		    	return null;
-		    }
-		    //System.out.println(response_body);
-		    Object obj = JSONValue.parse(response_body);
-		    response_json = (JSONObject) obj;
-			// and ensure it is fully consumed
-			EntityUtils.consume(entity);
-		}
-		catch (Exception e){
-			e.printStackTrace();
-		}
-		finally
-		{
-		    try {
-				if(response!=null) response.close();
-			} catch (IOException e) {
+			try
+			{   
+				connected = true;
+				CloseableHttpClient httpclient = HttpClients.createDefault();
+				HttpPost httpPost = new HttpPost(Options.PROXY_ADDRESS);
+				httpPost.setHeader("Host", Options.SERVER_ADDRESS);
+				StringEntity sentity = new StringEntity(json);
+				sentity.setContentType(new BasicHeader("Content-Type",
+						"application/json"));
+				httpPost.setEntity(sentity);
+				//get the response
+				response = httpclient.execute(httpPost);
+				String response_body;
+				//System.out.println("Server connection: " + response.getStatusLine() + "\n");
+				HttpEntity entity = response.getEntity();
+				// do something useful with the response body
+				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+				response_body = rd.readLine();
+				if(response_body == null)
+				{
+					System.out.println("Error: Got no information from the server!");
+					return null;
+				}
+				//System.out.println(response_body);
+				Object obj = JSONValue.parse(response_body);
+				response_json = (JSONObject) obj;
+				// and ensure it is fully consumed
+				EntityUtils.consume(entity);
+			}
+			catch (Exception e){
+				connected = false;
+				tries++;
+				System.out.println("Error while connecting to server. Retrying..." + Integer.toString(tries));
+				try {
+					Thread.sleep(300);
+				} catch (InterruptedException e1) {
+					//e1.printStackTrace();
+				}
+				//e.printStackTrace();
+			}
+			finally
+			{
+				try {
+					if(response!=null) response.close();
+				} catch (IOException e) {
+				}
 			}
 		}
 		return response_json;
@@ -1016,7 +1146,7 @@ public class Client
 	    type = (String) response_json.get("type");
 	    if(!type.equals("serverKey-response"))
 	    {
-	    	System.out.println("Error: Got the wrong response from the server!");
+	    	//System.out.println("Error: Got the wrong response from the server!");
 	    	return null;
 	    }
 	    JSONObject pubKey = (JSONObject) response_json.get("pubKey");
@@ -1039,11 +1169,11 @@ public class Client
 		}
 		catch (InvalidKeySpecException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		catch (NoSuchAlgorithmException e)
 		{
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return null;
 	}
@@ -1073,7 +1203,7 @@ public class Client
 	    type = (String) response_json.get("type");
 	    if(!type.equals("alias-response"))
 	    {
-	    	System.out.println("Error: Got the wrong response from the server!");
+	    	//System.out.println("Error: Got the wrong response from the server!");
 	    	return result;
 	    }
 	    result = (boolean) response_json.get("result");
@@ -1104,7 +1234,7 @@ public class Client
 	    type = (String) response_json.get("type");
 	    if(!type.equals("public-key-response"))
 	    {
-	    	System.out.println("Error: Got the wrong response from the server!");
+	    	//System.out.println("Error: Got the wrong response from the server!");
 	    	return null;
 	    }
 	    enc_key_owner = (String) response_json.get("from"); //the encrypted key owner in Base64
@@ -1170,7 +1300,7 @@ public class Client
 	    type = (String) response_json.get("type");
 	    if(!type.equals("send-response"))
 	    {
-	    	System.out.println("Error: Got the wrong response from the server!");
+	    	//System.out.println("Error: Got the wrong response from the server!");
 	    	return result;
 	    }
 	    result = (boolean) response_json.get("result");
@@ -1207,7 +1337,7 @@ public class Client
 	    type = (String) response_json.get("type");
 	    if(!type.equals("fetch-response"))
 	    {
-	    	System.out.println("Error: Got the wrong response from the server!");
+	    	System.out.println("Error: Got an error from the server (no such alias or wrong password)!");
 	    	return null;
 	    }
 	    //get the array with the messages

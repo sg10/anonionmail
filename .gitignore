@@ -1,4 +1,5 @@
 *.class
+client/*.key
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
@@ -6,6 +7,8 @@
 # Package Files #
 *.war
 *.ear
+client/bin/*
+client/src/*/*.jar
 
 # Eclipse Project Files #
 .classpath
