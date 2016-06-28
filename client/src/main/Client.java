@@ -1073,7 +1073,7 @@ public class Client
 		JSONObject response_json = null;
 		boolean connected = false;
 		int tries = 0;
-		while((connected == false) && (tries < 10))
+		while((connected == false) && (tries < 15))
 		{
 			try
 			{   
