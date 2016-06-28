@@ -183,7 +183,7 @@ public class Client
 				}
 				else
 				{
-					input_string = input_string + "\n\t";
+					input_string = input_string + "\n\t" + temp + "\n\t";
 				}
 			}
 			else
