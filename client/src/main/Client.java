@@ -1073,7 +1073,7 @@ public class Client
 		JSONObject response_json = null;
 		boolean connected = false;
 		int tries = 0;
-		while((connected == false) && (tries < 5))
+		while((connected == false) && (tries < 10))
 		{
 			try
 			{   
@@ -1109,7 +1109,7 @@ public class Client
 				tries++;
 				System.out.println("Error while connecting to server. Retrying..." + Integer.toString(tries));
 				try {
-					Thread.sleep(300);
+					Thread.sleep(2000);
 				} catch (InterruptedException e1) {
 					//e1.printStackTrace();
 				}
